@@ -1,0 +1,15 @@
+public without sharing class UserAccountController {
+    
+    @AuraEnabled(cacheable=true)
+    public static Id getAccountId() {
+        Id userId = UserInfo.getUserId();
+
+        User u = [SELECT ContactId FROM User WHERE Id = :userId LIMIT 1];
+
+        if (u.ContactId == null) return null;
+
+        Contact c = [SELECT AccountId FROM Contact WHERE Id = :u.ContactId LIMIT 1];
+
+        return c.AccountId;
+    }
+}
