@@ -1,0 +1,135 @@
+import { LightningElement, wire, api, track } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
+import getPastOrders from '@salesforce/apex/OrderReorderController.getPastOrders';
+import getAccountId from '@salesforce/apex/UserAccountController.getAccountId';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+ 
+export default class ReorderWidget extends NavigationMixin(LightningElement) {
+ 
+    @api webstoreId;
+    @api recordId;
+ 
+    orders = [];
+    isLoading = false;
+    accountId;
+ 
+   
+    @wire(getAccountId)
+    wiredAccount({ data, error }) {
+        if (data) {
+            this.accountId = data;
+            console.log('AccountId:', data);
+        } else if (error) {
+            console.error('Error getting accountId:', error);
+        }
+    }
+ 
+    
+    @wire(getPastOrders, { accountId: '$accountId' })
+    wiredOrders({ error, data }) {
+        this.isLoading = true;
+ 
+        if (data) {
+            this.orders = data;
+            this.isLoading = false;
+        } else if (error) {
+            console.error('Error fetching orders:', error);
+            this.isLoading = false;
+        }
+    }
+ 
+  
+    handleReorder(event) {
+        const pId = event.target.dataset.productId;
+       
+        if (!pId) {
+            this.showToast('Error', 'Product ID missing.', 'error');
+            return;
+        }
+ 
+        console.log('Navigating to Product:', pId);
+ 
+        this[NavigationMixin.Navigate]({
+            type: 'standard__recordPage',
+            attributes: {
+                recordId: pId,
+                objectApiName: 'Product2',
+                actionName: 'view'
+            }
+        });
+    }
+ 
+    showToast(title, message, variant) {
+        this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
+    }
+}
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+<template>
+    <lightning-card title="Recent Orders" icon-name="standard:orders">
+        
+        <div class="slds-p-around_medium">
+            <template if:true={orders}>
+                
+                <template for:each={orders} for:item="order">
+                    
+                    <div key={order.id} class="slds-box slds-m-bottom_small slds-theme_default">
+                        
+                        <div class="slds-grid slds-grid_vertical-align-center">
+                            
+                            <div class="slds-col slds-size_2-of-3">
+                                <p class="slds-text-title_caps slds-m-bottom_xx-small">
+                                    Order: <strong>{order.orderNumber}</strong>
+                                </p>
+                                <h3 class="slds-text-heading_small slds-truncate" title={order.firstProductName}>
+                                    {order.firstProductName}
+                                </h3>
+                                <p class="slds-text-color_weak slds-m-top_xxx-small">
+                                    Total Amount: {order.total}
+                                </p>
+                            </div>
+
+                            <div class="slds-col slds-size_1-of-3 slds-text-align_right">
+                                <lightning-button 
+                                    label="Re-add to Cart" 
+                                    variant="brand"
+                                    icon-name="utility:add"
+                                    data-product-id={order.firstProductId}
+                                    onclick={handleReorder}>
+                                </lightning-button>
+                            </div>
+
+                        </div>
+                    </div>
+                </template>
+
+            </template>
+
+            <template if:false={orders}>
+                <div class="slds-text-align_center slds-p-vertical_large">
+                    <p class="slds-text-color_weak">No recent orders found for this account.</p>
+                </div>
+            </template>
+        </div>
+
+    </lightning-card>
+</template>
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>60.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+        <target>lightningCommunity__Default</target>
+        <target>lightningCommunity__Page</target>
+    </targets>
+    <targetConfigs>
+    <targetConfig targets="lightningCommunity__Default">
+        <property name="recordId" type="String" label="Account ID (Override)" />
+        <property name="webstoreId" type="String" label="(Required for Deploy) Webstore ID" />
+    </targetConfig>
+</targetConfigs>
+</LightningComponentBundle>
+-----------------------------------------------------------------------------------------------------------------------------
