@@ -1,0 +1,44 @@
+public without sharing class OrderReorderController {
+    
+    @AuraEnabled
+    public static String addItemsToCart(String effectiveAccountId, String productId) {
+        try {
+            
+            WebStore store = [SELECT Id FROM WebStore LIMIT 1];
+            
+            ConnectApi.CartItemInput cartInput = new ConnectApi.CartItemInput();
+            cartInput.productId = productId;
+            cartInput.quantity = '1';
+            cartInput.type = ConnectApi.CartItemType.PRODUCT;
+            
+            ConnectApi.CartItem cartItem = ConnectApi.CommerceCart.addItemToCart(
+                store.Id, 
+                effectiveAccountId, 
+                'current', 
+                cartInput
+            );
+            return 'Success: Added ' + cartItem.cartItemId;
+        } catch (Exception e) {
+            return 'Error: ' + e.getMessage();
+        }
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, Object>> getPastOrders(String accountId) {
+        List<Map<String, Object>> result = new List<Map<String, Object>>();
+        for (Order ord : [SELECT Id, OrderNumber, GrandTotalAmount, 
+                         (SELECT Product2Id, Product2.Name FROM OrderItems WHERE Product2Id != null LIMIT 1) 
+                         FROM Order WHERE AccountId = :accountId ORDER BY CreatedDate DESC LIMIT 5]) {
+            Map<String, Object> m = new Map<String, Object>();
+            m.put('id', ord.Id);
+            m.put('orderNumber', ord.OrderNumber);
+            m.put('total', ord.GrandTotalAmount);
+            if(!ord.OrderItems.isEmpty()){
+                m.put('firstProductId', ord.OrderItems[0].Product2Id);
+                m.put('firstProductName', ord.OrderItems[0].Product2.Name);
+            }
+            result.add(m);
+        }
+        return result;
+    }
+}
