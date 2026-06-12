@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+ 
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+</LightningComponentBundle>
+
+<template>
+    <lightning-card title="Order Comments">
+
+        <template lwc:if={isLoading}>
+            <lightning-spinner alternative-text="Loading"></lightning-spinner>
+        </template>
+
+        <div class="slds-p-around_medium card-body">
+
+            <template lwc:if={comments}>
+                <div class="comment-display">
+                    <lightning-formatted-text value={comments}></lightning-formatted-text>
+                </div>
+            </template>
+            <template lwc:else>
+                <p class="no-comments">No comments available.</p>
+            </template>
+
+            <div class="slds-m-top_medium">
+                <lightning-textarea
+                    label="Add Comment"
+                    value={newComment}
+                    maxlength="500"
+                    onchange={handleCommentChange}>
+                </lightning-textarea>
+            </div>
+
+            <div class="slds-m-top_medium button-row">
+                <lightning-button
+                    label="Add Comment"
+                    variant="brand"
+                    onclick={handleSave}
+                    disabled={isSaveDisabled}>
+                </lightning-button>
+            </div>
+
+        </div>
+
+    </lightning-card>
+</template>
+
+
+import { LightningElement, wire } from 'lwc';
+import { CurrentPageReference } from 'lightning/navigation';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import getComments from '@salesforce/apex/OrderHistoryCommentController.getComments';
+import addComment from '@salesforce/apex/OrderHistoryCommentController.addComment';
+
+export default class OrderHistoryComments extends LightningElement {
+
+    comments = '';
+    newComment = '';
+    isLoading = false;
+    orderSummaryId = null;
+
+    @wire(CurrentPageReference)
+    wiredPageRef({ attributes, state } = {}) {
+        const id = attributes?.recordId || state?.recordId || state?.id;
+
+        if (!id || id === this.orderSummaryId) return;
+
+        this.orderSummaryId = id;
+        this.loadComments();
+    }
+
+    async loadComments() {
+        this.isLoading = true;
+        try {
+            this.comments = await getComments({
+                orderSummaryId: this.orderSummaryId
+            }) || '';
+        } catch (error) {
+            this.showToast('Error', this.getErrorMessage(error), 'error');
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    handleCommentChange(event) {
+        this.newComment = event.detail.value;
+    }
+
+    get isSaveDisabled() {
+        return !this.newComment?.trim();
+    }
+
+    async handleSave() {
+        if (this.isSaveDisabled) return;
+
+        this.isLoading = true;
+        try {
+            await addComment({
+                orderSummaryId: this.orderSummaryId,
+                comment: this.newComment.trim()
+            });
+
+            this.newComment = '';
+            await this.loadComments();
+            this.showToast('Success', 'Comment added successfully.', 'success');
+
+        } catch (error) {
+            this.showToast('Error', this.getErrorMessage(error), 'error');
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    showToast(title, message, variant) {
+        this.dispatchEvent(new ShowToastEvent({ title, message, variant }));
+    }
+
+    getErrorMessage(error) {
+        return (
+            error?.body?.message ||
+            error?.message ||
+            'Unexpected error occurred.'
+        );
+    }
+}
+
+
+:host {
+    display: block;
+    container-type: inline-size;
+    container-name: card;
+}
+
+
+.card-body {
+    position: relative;
+}
+
+lightning-spinner {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+
+.comment-display {
+    min-height: 3rem;
+    padding: 0.75rem;
+    background: #f3f3f3;
+    border-left: 3px solid #0070d2;
+    border-radius: 0 4px 4px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    font-size: clamp(0.8rem, 2vw, 0.9375rem);
+}
+
+
+.no-comments {
+    color: #706e6b;
+    font-style: italic;
+    font-size: clamp(0.75rem, 2vw, 0.875rem);
+    margin: 0;
+}
+
+
+lightning-textarea {
+    display: block;
+    width: 100%;
+}
+
+
+.button-row {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+
+@container card (max-width: 480px) {
+    .comment-display {
+        padding: 0.5rem;
+        font-size: 0.8125rem;
+        border-left-width: 2px;
+    }
+
+    .button-row {
+        justify-content: stretch;
+    }
+
+    .button-row lightning-button {
+        width: 100%;
+        display: block;
+    }
+}
+
+@container card (min-width: 480px) and (max-width: 768px) {
+    .comment-display {
+        padding: 0.625rem;
+        font-size: 0.875rem;
+    }
+
+    .button-row {
+        justify-content: flex-end;
+    }
+}
+
+
+@container card (min-width: 768px) {
+    .comment-display {
+        padding: 0.75rem 1rem;
+        font-size: 0.9375rem;
+    }
+
+    .button-row {
+        justify-content: flex-end;
+    }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+@media (forced-colors: active) {
+    .comment-display {
+        border-left-color: ButtonText;
+        background: Canvas;
+    }
+}
