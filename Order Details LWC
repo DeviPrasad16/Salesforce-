@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+   <isExposed>true</isExposed>
+    <targets>
+ 
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+
+</LightningComponentBundle> 
+
+<template>
+
+    <template if:true={isLoading}>
+        <div class="loading-state">
+            <lightning-spinner
+                alternative-text="Loading order details"
+                size="medium">
+            </lightning-spinner>
+        </div>
+    </template>
+
+    <template if:true={hasError}>
+        <div class="error-state">
+            <lightning-icon
+                icon-name="utility:error"
+                variant="error"
+                size="small">
+            </lightning-icon>
+            <p>{errorMessage}</p>
+        </div>
+    </template>
+
+    <template if:true={hasData}>
+
+        <div class="tab-content">
+
+            <div class="table-card-header">
+                <span class="table-card-title">Purchased Items</span>
+            </div>
+
+            <template if:true={itemsEmpty}>
+                <div class="empty-state">
+                    <lightning-icon
+                        icon-name="utility:product"
+                        size="medium">
+                    </lightning-icon>
+                    <p>No purchased items found for this order.</p>
+                </div>
+            </template>
+
+            <template if:false={itemsEmpty}>
+                <div class="table-container">
+                    <table class="items-table">
+
+                        <thead>
+                            <tr>
+                                <th class="col-image">Product Image</th>
+                                <th class="col-name">Product Name</th>
+                                <th class="col-sku">SKU</th>
+                                <th class="col-qty align-center">Qty</th>
+                                <th class="col-total align-right">Price</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <template for:each={items} for:item="item">
+                                <tr key={item.itemId} class="item-row">
+
+                                    <td class="image-cell">
+                                        <div class="image-wrap">
+                                            <template if:true={item.hasImage}>
+                                                <img
+                                                    src={item.imageUrl}
+                                                    alt={item.productName}
+                                                    class="product-image"
+                                                    onerror={handleImageError}>
+                                            </template>
+                                        </div>
+                                    </td>
+
+                                    <td class="name-cell">{item.productName}</td>
+
+                                    <td class="sku-cell">{item.productSku}</td>
+
+                                    <td class="align-center">
+                                        <span class="qty-pill">{item.quantity}</span>
+                                    </td>
+
+                                    <td class="align-right">
+                                        <span class="price">{item.formattedTotalPrice}</span>
+                                    </td>
+
+                                </tr>
+                            </template>
+                        </tbody>
+
+                    </table>
+                </div>
+            </template>
+
+        </div>
+
+    </template>
+
+</template>
+
+import { LightningElement, api, wire } from 'lwc';
+import { CurrentPageReference } from 'lightning/navigation';
+
+import getOrderDetails from '@salesforce/apex/OrderDetailsController.getOrderDetails';
+import getOrderItems from '@salesforce/apex/OrderDetailsController.getOrderItems';
+
+import { getProduct } from 'commerce/productApi';
+import LOCALE from '@salesforce/i18n/locale';
+import CURRENCY from '@salesforce/i18n/currency';
+
+const fmt = (amount) =>
+    new Intl.NumberFormat(LOCALE, {
+        style: 'currency',
+        currency: CURRENCY
+    }).format(amount || 0);
+
+const isShipping = (item) =>
+    item.productFamily === 'Shipping' ||
+    item.type === 'Shipping' ||
+    item.itemType === 'Shipping' ||
+    (item.productName || '').toLowerCase().includes('shipping');
+
+export default class OrderDetails extends LightningElement {
+
+    @api recordId;
+
+     order = null;
+    items = [];
+    isLoading = true;
+    hasError = false;
+    errorMessage = '';
+
+    @wire(CurrentPageReference)
+    pageRef;
+
+    get orderSummaryId() {
+        return (
+            this.recordId ||
+            this.pageRef?.state?.recordId ||
+            this.pageRef?.state?.id ||
+            this.pageRef?.state?.orderSummaryId ||
+            this.pageRef?.attributes?.recordId
+        );
+    }
+
+    connectedCallback() {
+        setTimeout(() => {
+            console.log('Order Summary Id =>', this.orderSummaryId);
+            this.loadAll();
+        }, 400);
+    }
+
+    async loadAll() {
+        const orderSummaryId = this.orderSummaryId;
+
+        if (!orderSummaryId) {
+            this.hasError = true;
+            this.errorMessage = 'Order Summary Id not found.';
+            this.isLoading = false;
+            return;
+        }
+
+        this.isLoading = true;
+        this.hasError = false;
+
+        try {
+            const [orderData, itemsData] = await Promise.all([
+                getOrderDetails({ orderSummaryId }),
+                getOrderItems({ orderSummaryId })
+            ]);
+
+            this.order = orderData;
+            console.log('Raw Apex items:', JSON.stringify(itemsData));
+            this.items = this.mapItems(itemsData || []);
+            await this.loadProductData();
+
+        } catch (e) {
+            console.error('Apex Error:', e);
+            this.hasError = true;
+            this.errorMessage =
+                e?.body?.message ||
+                e?.message ||
+                'An unexpected error occurred.';
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    mapItems(data) {
+        return data
+            .filter(item => !isShipping(item))
+            .map(item => ({
+                ...item,
+                imageUrl: null,
+                hasImage: false,
+                formattedUnitPrice: fmt(item.unitPrice),
+                formattedTotalPrice: fmt(item.totalPrice)
+            }));
+    }
+
+    async loadProductData() {
+        const updatedItems = [];
+
+        for (const item of this.items) {
+            try {
+                if (!item.productId) {
+                    updatedItems.push(item);
+                    continue;
+                }
+
+                const product = await getProduct({
+                    productId: item.productId
+                });
+
+
+                updatedItems.push({
+                    ...item,
+                    imageUrl:
+                        product?.defaultImage?.url ||
+                        product?.defaultImage?.contentUrl ||
+                        null,
+                    hasImage: !!(
+                        product?.defaultImage?.url ||
+                        product?.defaultImage?.contentUrl
+                    )
+                    
+                });
+
+            } catch (error) {
+                console.error('Product API Error', item.productName, error);
+                updatedItems.push({
+                    ...item,
+                    imageUrl: null,
+                    hasImage: false
+                   
+                });
+            }
+        }
+
+        this.items = updatedItems;
+    }
+
+    handleImageError(event) {
+        event.target.style.display = 'none';
+    }
+
+    get hasData() {
+        return !this.isLoading && !this.hasError && this.order != null;
+    }
+
+    get itemCount() {
+        return this.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    }
+
+    get itemsEmpty() {
+        return this.items.length === 0;
+    }
+
+    get formattedTotal() {
+        return this.order?.totalAmount ? fmt(this.order.totalAmount) : '$0.00';
+    }
+
+    get orderTotal() {
+        const total = this.items.reduce(
+            (sum, item) => sum + (item.totalPrice || 0),
+            0
+        );
+        return fmt(total);
+    }
+
+    get statusClass() {
+        return this.order?.statusClass || 'status-badge status-draft';
+    }
+}
+
+
+.loading-state,
+.error-state,
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    gap: 12px;
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+}
+
+.error-state { color: #a32d2d; }
+
+.tab-content {
+    background: #ffffff;
+    border: 1px solid #e8e6df;
+    border-radius: 14px;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.table-card-header {
+    padding: 16px 20px;
+}
+
+.table-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: auto;
+}
+
+.items-table thead {
+    background: #f5f4ef;
+    border-top: 1px solid #e8e6df;
+    border-bottom: 1px solid #e8e6df;
+}
+
+.items-table th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #999;
+    white-space: nowrap;
+}
+
+.items-table td {
+    padding: 14px 16px;
+    vertical-align: middle;
+    color: #1a1a1a;
+    border-bottom: 1px solid #f0ede6;
+}
+
+.items-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.items-table tbody tr:hover {
+    background: #faf9f6;
+    transition: background-color 0.15s ease;
+}
+
+
+.col-image { width: 60px; }
+.col-name  { width: auto; }
+.col-sku   { width: 110px; }
+.col-qty   { width: 72px; }
+.col-total { width: 100px; }
+
+
+.image-cell { width: 60px; }
+
+.image-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid #e8e6df;
+    background: #f5f4ef;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.product-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+
+.name-cell {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+
+.sku-cell {
+    font-size: 12px;
+    color: #888;
+}
+
+
+.qty-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    border-radius: 7px;
+    background: #ffffff;
+    border: 1px solid #dddbd4;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 0 8px;
+    color: #1a1a1a;
+}
+
+
+.price {
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+
+.align-center { text-align: center; }
+.align-right  { text-align: right; }
+
+
+@media (max-width: 600px) {
+    
+    .items-table th,
+    .items-table td {
+        padding: 12px 10px;
+    }
+
+    .image-wrap {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+    }
+
+    .price {
+        font-size: 13px;
+    }
+}
