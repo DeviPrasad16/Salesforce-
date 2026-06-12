@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+       <isExposed>true</isExposed>
+    <targets>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+</LightningComponentBundle>    
+
+<template>
+    <lightning-card title="KogniBiz Support Team" >
+        <div class="slds-p-around_medium">
+            
+       
+            <template if:true={isStep1}>
+                <div class="slds-medium-size_1-of-3">
+                    <p class="slds-m-bottom_small">Please enter your registered email to receive a verification code.</p>
+                    <lightning-input 
+                        data-id="email" 
+                        label="Registered Email" 
+                        type="email" 
+                        value={formData.email} 
+                        onchange={handleInputChange} 
+                        required>
+                    </lightning-input>
+                </div>
+                <div class="slds-medium-size_1-of-3">
+                    <lightning-button label="Send OTP" variant="brand" onclick={handleSendOTP}></lightning-button>
+                    <lightning-button label="Back" class="slds-m-left_x-small" onclick={handleCancel}></lightning-button>
+                </div>
+            </template>
+
+           
+            <template if:true={isStep2}>
+                <div class="slds-medium-size_1-of-3">
+                    <p class="slds-text-color_success">OTP sent to {formData.email}</p>
+                    <p class="slds-text-body_small slds-m-bottom_small">Code expires in 1 minutes.</p>
+                    
+                    <lightning-input 
+                        data-id="otp" 
+                        label="Verification Code" 
+                        maxlength="6" 
+                        value={formData.otp} 
+                        onchange={handleInputChange} 
+                        required>
+                    </lightning-input>
+                    
+                   <lightning-input 
+    data-id="name" 
+    label="Full Name" 
+    type="text"
+    value={formData.name} 
+    onchange={handleInputChange} 
+    pattern="^[a-zA-Z\s]*$"
+    message-when-pattern-mismatch="Please enter only letters (A-Z) and spaces."
+    required>
+</lightning-input>
+                    
+                    <lightning-textarea 
+                        data-id="issue" 
+                        label="Issue Details" 
+                        value={formData.issue} 
+                        onchange={handleInputChange} 
+                        required>
+                    </lightning-textarea>
+                </div>
+                <div class="slds-m-top_medium">
+                    <lightning-button label="Submit Request" variant="brand" onclick={handleSubmit}></lightning-button>
+                    <lightning-button label="Back" class="slds-m-left_x-small" onclick={handleBack}></lightning-button>
+                </div>
+            </template>
+
+           
+            <template if:true={isLoading}>
+                <lightning-spinner alt-text="Processing..." size="medium"></lightning-spinner>
+            </template>
+        </div>
+    </lightning-card> 
+</template> 
+
+import { LightningElement } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
+import ToastContainer from 'lightning/toastContainer';
+import Toast from 'lightning/toast';
+import startValidation from '@salesforce/apex/KV_B2B_SupportController.startValidationProcess';
+import requestFinalSubmission from '@salesforce/apex/KV_B2B_SupportController.requestFinalSubmission';
+
+export default class KvB2BSupportForm extends NavigationMixin(LightningElement) {
+    step = 1;
+    isLoading = false;
+    isFinished = false;
+    formData = {
+        email: '',
+        otp: '',
+        name: '',
+        issue: ''
+    };
+
+    get isStep1() { return this.step === 1 && !this.isFinished; }
+    get isStep2() { return this.step === 2 && !this.isFinished; }
+    get showSuccess() { return this.isFinished; }
+
+    connectedCallback() {
+        const toastContainer = ToastContainer.instance();
+        toastContainer.maxShown = 2;
+        toastContainer.toastPosition = 'top-center';
+    }
+
+    handleInputChange(event) {
+        const field = event.target.dataset.id;
+        this.formData[field] = event.target.value;
+    }
+
+    handleSendOTP() {
+        if (!this.formData.email) {
+            this.fireToast('Required', 'Please enter your email.', 'warning');
+            return;
+        }
+
+        this.isLoading = true;
+        startValidation({ userEmail: this.formData.email })
+            .then(() => {
+                this.step = 2;
+                this.fireToast('Success', 'A Verification code was sent to your email.', 'success');
+            })
+            .catch(error => {
+                this.fireToast('Registration Error', error.body.message, 'error');
+            })
+            .finally(() => { this.isLoading = false; });
+    }
+
+    handleSubmit() {
+        const { name, email, otp, issue } = this.formData;
+        if (!name || !otp || !issue) {
+            this.fireToast('Missing Info', 'Please fill in all fields.', 'warning');
+            return;
+        }
+
+        this.isLoading = true;
+        requestFinalSubmission({ name, email, otpInput: otp, issue })
+            .then(() => {
+                this.fireToast('Success', 'Your support request has been logged.', 'success');
+                this.isFinished = true;
+
+               
+                setTimeout(() => {
+                    this.redirectToLogin();
+                }, 1000);
+            })
+            .catch(error => {
+                const errorMsg = error.body?.message || 'Submission failed.';
+
+                if (errorMsg.toLowerCase().includes('expired')) {
+                    this.fireToast('Time Expired', errorMsg, 'error');
+                    setTimeout(() => { this.handleBack(); }, 3000);
+                } else {
+                    this.fireToast('Submission Error', errorMsg, 'error');
+                }
+            })
+            .finally(() => { this.isLoading = false; });
+    }
+
+    redirectToLogin() {
+        this[NavigationMixin.Navigate]({
+            type: 'comm__namedPage',
+            attributes: {
+                name: 'Login'
+            }
+        });
+    }
+
+    fireToast(label, message, variant) {
+        Toast.show({
+            label: label,
+            message: message,
+            variant: variant,
+            mode: 'dismissible'
+        }, this);
+    }
+
+    handleBack() {
+        this.step = 1;
+        this.formData.otp = '';
+    }
+
+    handleCancel() {
+        this[NavigationMixin.Navigate]({
+        type: 'comm__namedPage',
+        attributes: { name: 'Login'}
+    });
+    }
+} 
+
