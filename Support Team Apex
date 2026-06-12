@@ -1,0 +1,204 @@
+public without sharing class KV_B2B_SupportController {
+
+    private static final Integer EXPIRY_LIMIT_MINS = 1;
+
+
+ 
+    private class EmailConfig {
+      
+        public final String brandPrimary = '#1A365D'; 
+        public final String supportEmail = 'support@kognivera.com';
+       
+        public final String orgName     = [SELECT Name FROM Organization LIMIT 1].Name;
+
+     
+        public String preheader;
+        public String subject;
+        public String htmlContent;
+
+
+        public void prepareOTPEmail(String otp) {
+            this.subject = 'Your Verification Code: ' + otp;
+            this.preheader = 'Your secure one-time verification code.';
+            this.htmlContent = 
+                '<h2 style="margin:0 0 16px;color:#1A202C;font-size:20px;font-weight:600;">Hello,</h2>'
+                + '<p style="margin:0 0 24px;color:#4A5568;font-size:15px;line-height:24px;">Your secure verification code is below. Enter this code on the portal to continue.</p>'
+                + '<div style="background-color:#F7FAFC;border:1px dashed #CBD5E0;border-radius:6px;padding:20px;text-align:center;margin-bottom:24px;">'
+                + '  <span style="font-family:Courier,monospace;font-size:32px;font-weight:bold;letter-spacing:4px;color:#2B6CB0;">' + otp + '</span>'
+                + '</div>'
+                + '<p style="margin:0;color:#718096;font-size:14px;line-height:22px;">This code is valid for <strong>' + EXPIRY_LIMIT_MINS + ' minute</strong></p>';
+        }
+
+  
+        public void prepareCustomerReceipt(String name, String email, String issue) {
+            this.subject = 'Request Received: ' + name;
+            this.preheader = 'We have successfully received your support request.';
+            this.htmlContent = 
+                '<h2 style="margin:0 0 16px;color:#1A202C;font-size:20px;font-weight:600;">Hi ' + name + ',</h2>'
+                + '<p style="margin:0 0 24px;color:#4A5568;font-size:15px;line-height:24px;">Your support request has been successfully received. Our team will review your request and get back to you shortly.</p>'
+                + '<h3 style="margin:0 0 10px;color:#2D3748;font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">Submitted Details</h3>'
+                + '<table width="100%" cellpadding="8" cellspacing="0" style="background-color:#F7FAFC;border-radius:6px;font-size:14px;color:#4A5568;margin-bottom:10px;">'
+                + '  <tr><td width="25%" style="font-weight:bold;padding-left:12px;">Email:</td><td>' + email + '</td></tr>'
+                + '  <tr><td style="font-weight:bold;padding-left:12px;vertical-align:top;">Issue:</td><td style="white-space:pre-line;">' + issue + '</td></tr>'
+                + '</table>';
+        }
+
+
+        public void prepareAgentNotification(String agentName, String name, String email, String issue) {
+            this.subject = 'NEW Support Request from ' + name;
+            this.preheader = 'A new B2B storefront support entry requires review.';
+            this.htmlContent = 
+                '<h2 style="margin:0 0 16px;color:#1A202C;font-size:20px;font-weight:600;">Hello ' + agentName + ',</h2>'
+                + '<p style="margin:0 0 24px;color:#4A5568;font-size:15px;line-height:24px;">A new support ticket has been registered in the system. Please review the request details below:</p>'
+                + '<table width="100%" cellpadding="8" cellspacing="0" style="background-color:#F7FAFC;border-radius:6px;font-size:14px;color:#4A5568;margin-bottom:10px;">'
+                + '  <tr><td width="30%" style="font-weight:bold;padding-left:12px;">Requester Name:</td><td>' + name + '</td></tr>'
+                + '  <tr><td style="font-weight:bold;padding-left:12px;">Requester Email:</td><td>' + email + '</td></tr>'
+                + '  <tr><td style="font-weight:bold;padding-left:12px;vertical-align:top;">Reported Issue:</td><td style="white-space:pre-line;">' + issue + '</td></tr>'
+                + '</table>';
+        }
+    }
+
+    
+
+    @AuraEnabled
+    public static void startValidationProcess(String userEmail) {
+        if (String.isBlank(userEmail)) {
+            throw new AuraHandledException('Email is required.');
+        }
+
+        List<User> storefrontUsers = [SELECT Id FROM User 
+                                     WHERE Email = :userEmail 
+                                     AND IsActive = true 
+                                     LIMIT 1];
+        
+        if (storefrontUsers.isEmpty()) {
+            throw new AuraHandledException('Error: No active user account found with this email.');
+        }
+
+        generateAndSendOTPFuture(userEmail);
+    }
+
+    @future
+    public static void generateAndSendOTPFuture(String email) {
+        try {
+            delete as system [SELECT Id FROM KV_OTP_Verification__c WHERE KV_Email__c = :email];
+
+            String otp = String.valueOf(Math.round(Math.random() * 899999 + 100000));
+            
+            KV_OTP_Verification__c vRecord = new KV_OTP_Verification__c(
+                KV_Email__c = email,
+                KV_OTP_Code__c = otp,
+                KV_Generated_Time__c = DateTime.now()
+            );
+            insert as system vRecord;
+
+          
+            EmailConfig config = new EmailConfig();
+            config.prepareOTPEmail(otp);
+
+            sendAsyncEmail(email, config.subject, buildMasterHtml(config));
+            
+        } catch (Exception e) {
+            System.debug('KV_B2B OTP Error: ' + e.getMessage());
+        }
+    }
+
+    @AuraEnabled
+    public static void requestFinalSubmission(String name, String email, String otpInput, String issue) {
+        List<KV_OTP_Verification__c> logs = [SELECT KV_OTP_Code__c, KV_Generated_Time__c 
+                                        FROM KV_OTP_Verification__c 
+                                        WHERE KV_Email__c = :email 
+                                        LIMIT 1];
+
+        if (logs.isEmpty()) {
+            throw new AuraHandledException('No active verification session found. Please request a new code.');
+        }
+
+        KV_OTP_Verification__c log = logs[0];
+        
+        Long diffMinutes = (DateTime.now().getTime() - log.KV_Generated_Time__c.getTime()) / 60000;
+        if (diffMinutes > EXPIRY_LIMIT_MINS) {
+            delete as system log; 
+            throw new AuraHandledException('Your verification code has expired. Please request a new one.');
+        }
+
+        if (log.KV_OTP_Code__c != otpInput) {
+            throw new AuraHandledException('Invalid verification code. Please check your email.');
+        }
+
+        processFinalFormFuture(name, email, issue, log.Id);
+    }
+
+    @future
+    public static void processFinalFormFuture(String name, String email, String issue, Id logId) {
+        try {
+            KV_SupportTeam__c entry = new KV_SupportTeam__c(
+                KV_Name__c = name,
+                KV_Email__c = email,
+                KV_Issue__c = issue
+            );
+            insert as system entry;
+
+            delete as system [SELECT Id FROM KV_OTP_Verification__c WHERE Id = :logId];
+
+            
+            EmailConfig customerConfig = new EmailConfig();
+            customerConfig.prepareCustomerReceipt(name, email, issue);
+            sendAsyncEmail(email, customerConfig.subject, buildMasterHtml(customerConfig));
+                        List<User> supportAgents = [SELECT Email, Name FROM User 
+                                       WHERE Name = 'Support Manager A' 
+                                       AND IsActive = true 
+                                       LIMIT 1];
+
+            if (!supportAgents.isEmpty()) {
+                User agent = supportAgents[0];
+                EmailConfig agentConfig = new EmailConfig();
+                agentConfig.prepareAgentNotification(agent.Name, name, email, issue);
+                sendAsyncEmail(agent.Email, agentConfig.subject, buildMasterHtml(agentConfig));
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.ERROR, 'KV_B2B Async Error: ' + e.getMessage());
+        }
+    }
+
+    private static void sendAsyncEmail(String toAddress, String subject, String htmlBody) {
+        List<OrgWideEmailAddress> oweaList = [SELECT Id FROM OrgWideEmailAddress LIMIT 1];
+        if (oweaList.isEmpty()) return;
+
+        Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+        mail.setOrgWideEmailAddressId(oweaList[0].Id);
+        mail.setToAddresses(new String[] { toAddress });
+        mail.setSubject(subject);
+        mail.setHtmlBody(htmlBody); 
+        
+        if (!Test.isRunningTest()) {
+            Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+        }
+    }
+
+   
+    private static String buildMasterHtml(EmailConfig config) {
+        return '<!DOCTYPE html>'
+            + '<html lang="en"><head><meta charset="UTF-8"/>'
+            + '<meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>'
+            + '<body style="margin:0;padding:0;background-color:#F4F6F9;font-family:Arial,Helvetica,sans-serif;">'
+            + '<div style="display:none;max-height:0;overflow:hidden;color:#F4F6F9;">' + config.preheader + '</div>'
+            + '<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6F9;padding:32px 0;">'
+            + '<tr><td align="center">'
+            + '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">'
+            + '<tr><td style="background-color:' + config.brandPrimary + ';border-radius:8px 8px 0 0;padding:28px 40px;text-align:center;">'
+           
+            + '<p style="margin:0;color:#FFFFFF;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:0.75;">' + config.orgName + ' B2B Storefront</p>'
+            + '</td></tr>'
+            + '<tr><td style="background-color:#FFFFFF;padding:40px;border-left:1px solid #E2E8F0;border-right:1px solid #E2E8F0;">'
+            + config.htmlContent
+            + '</td></tr>'
+            + '<tr><td style="background-color:' + config.brandPrimary + ';border-radius:0 0 8px 8px;padding:20px 40px;text-align:center;">'
+            + '<p style="margin:0 0 6px;color:#FFFFFF;font-size:12px;opacity:0.9;">© ' + DateTime.now().year() + ' ' + config.orgName + '. All rights reserved.</p>'
+            + '<p style="margin:0;font-size:11px;color:#FFFFFF;opacity:0.6;">This is an automated message — please do not reply. '
+            + 'For help, contact <a href="mailto:' + config.supportEmail + '" style="color:#FFFFFF;text-decoration:underline;">' + config.supportEmail + '</a></p>'
+            + '</td></tr>'
+            + '</table></td></tr></table>'
+            + '</body></html>';
+    }
+}
