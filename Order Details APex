@@ -1,0 +1,110 @@
+
+public without sharing class OrderDetailsController {
+
+    
+    @AuraEnabled(cacheable=true)
+    public static OrderDetailWrapper getOrderDetails(String orderSummaryId) {
+        validateId(orderSummaryId);
+        try {
+            Order order = [
+                SELECT Id, OrderNumber, Status, TotalAmount, EffectiveDate, CreatedBy.Name
+                FROM   Order
+                WHERE  Id IN (SELECT OriginalOrderId FROM OrderSummary WHERE Id = :orderSummaryId)
+                WITH   SECURITY_ENFORCED
+                LIMIT  1
+            ];
+
+            OrderDetailWrapper wrapper = new OrderDetailWrapper();
+           wrapper.orderId       = order.Id;
+           wrapper.orderNumber   = order.OrderNumber;
+            wrapper.status        = order.Status;
+            wrapper.totalAmount   = nvl(order.TotalAmount);
+           wrapper.effectiveDate = order.EffectiveDate != null ? String.valueOf(order.EffectiveDate) : '';
+           wrapper.userName      = order.CreatedBy     != null ? order.CreatedBy.Name : '';
+            return wrapper;
+
+        } catch (AuraHandledException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error fetching order details: ' + e.getMessage());
+        }
+    }
+
+    @AuraEnabled(cacheable=true)  
+    public static List<OrderItemWrapper> getOrderItems(String orderSummaryId) {
+        validateId(orderSummaryId);
+        try {
+            List<OrderItem> items = [
+                SELECT Id, Product2Id,
+                       Product2.Name, Product2.StockKeepingUnit,
+                       Product2.ProductCode, Product2.Family, Product2.Description,
+                       Quantity, UnitPrice, TotalPrice
+                FROM   OrderItem
+                WHERE  OrderId IN (SELECT OriginalOrderId FROM OrderSummary WHERE Id = :orderSummaryId)
+                WITH   SECURITY_ENFORCED
+                ORDER BY CreatedDate ASC
+            ];
+
+            List<OrderItemWrapper> result = new List<OrderItemWrapper>(items.size());
+            for (OrderItem item : items) {
+                result.add(toWrapper(item));
+            }
+            return result;
+
+        } catch (AuraHandledException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error fetching order items: ' + e.getMessage());
+        }
+    }
+
+
+    private static void validateId(String id) {
+        if (String.isBlank(id)) {
+            throw new AuraHandledException('Order Summary ID is required.');
+        }
+    }
+
+  
+    private static Decimal nvl(Decimal val) {
+        return val != null ? val : 0;
+    }
+
+    private static OrderItemWrapper toWrapper(OrderItem item) {
+        OrderItemWrapper wrapper  = new OrderItemWrapper();
+        Boolean hasProduct    = item.Product2 != null;
+
+        wrapper.itemId = item.Id;
+       wrapper.productId = item.Product2Id;
+       wrapper.productName = hasProduct ? item.Product2.Name : 'No Product';
+       wrapper.productSku  = hasProduct ? (String.isNotBlank(item.Product2.StockKeepingUnit) ? item.Product2.StockKeepingUnit : String.isNotBlank(item.Product2.ProductCode) ? item.Product2.ProductCode : '') : '';
+        wrapper.productFamily = hasProduct ? item.Product2.Family      : '';
+       wrapper.productDescription = hasProduct ? item.Product2.Description : '';
+      wrapper.quantity = nvl(item.Quantity);
+        wrapper.unitPrice = nvl(item.UnitPrice);
+        wrapper.totalPrice = nvl(item.TotalPrice);
+        return wrapper;
+    }
+
+    
+    public class OrderDetailWrapper {
+        @AuraEnabled public String  orderId;
+        @AuraEnabled public String  orderNumber;
+        @AuraEnabled public String  status;
+        @AuraEnabled public Decimal totalAmount;
+        @AuraEnabled public String  effectiveDate;
+        @AuraEnabled public String  userName;
+    }
+
+    public class OrderItemWrapper {
+        @AuraEnabled public String  itemId;
+        @AuraEnabled public String  productId;
+        @AuraEnabled public String  productName;
+        @AuraEnabled public String  productSku;
+        @AuraEnabled public String  productFamily;
+        @AuraEnabled public String  productDescription;
+        @AuraEnabled public Decimal quantity;
+        @AuraEnabled public Decimal unitPrice;
+        @AuraEnabled public Decimal totalPrice;
+    }
+}
