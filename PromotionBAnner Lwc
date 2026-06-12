@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+   <isExposed>true</isExposed>
+   <targets>
+        <target>lightning__RecordPage</target>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+
+    <targetConfigs>
+        <targetConfig targets="lightning__RecordPage,lightning__AppPage,lightning__HomePage,lightningCommunity__Default">
+            
+            <property name="defaultBuyerGroup" 
+                      type="String" 
+                      label="Target Buyer Group Name" 
+                      description="Enter the exact Name string of the Buyer Group to filter banners (e.g., General, Diamond, Gold)." 
+                      placeholder="e.g., Diamond" />
+
+            <property name="autoSlideInterval" 
+                      type="Integer" 
+                      label="Auto-Rotation Interval (ms)" 
+                      description="Time in milliseconds between slide transitions. Default is 5000 (5 seconds)." 
+                      default="5000" />
+
+            <property name="bannerHeight" 
+                      type="String" 
+                      label="Carousel Maximum Height" 
+                      description="Set the visual height footprint of the component. Must include units (px, rem, vh)." 
+                      default="420px" />
+
+            <property name="showDots" 
+                      type="Boolean" 
+                      label="Display Navigation Dots" 
+                      description="When enabled, renders indicator tracking dots along the bottom of the active frame." 
+                      default="true" />
+
+            <property name="showNavButtons" 
+                      type="Boolean" 
+                      label="Display Arrow Navigation Buttons" 
+                      description="When enabled, displays left and right directional arrows on hover." 
+                      default="true" />
+
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>   
+
+
+<template>
+    <div class="carousel-container" onmouseenter={handleMouseEnter} onmouseleave={handleMouseLeave}>
+        
+        <template if:true={isLoading}>
+            <div class="spinner-container">
+                <lightning-spinner alternative-text="Loading premium store offers..." size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:true={hasBanners}>
+            <div class="carousel-track">
+                <template for:each={banners} for:item="banner" for:index="index">
+                    <div key={banner.Id} class={banner.slideClass}>
+                        
+                        <img src={banner.imageUrl} alt={banner.headline} class="slide-image" />
+                        
+                        <div class="slide-overlay">
+                            <div class="overlay-content">
+                                
+                                <template if:true={banner.promoName}>
+                                    <div class="promo-pill-badge">
+                                        {banner.promoName}
+                                    </div>
+                                </template>
+
+                                <h2 class="headline-text">{banner.headline}</h2>
+                                <p class="sub-text">{banner.subText}</p>
+                                
+                                <template if:true={banner.endDate}>
+                                    <p class="banner-expiry-text">Valid till : {banner.endDate}</p>
+                                </template>
+
+                                <button class="action-button" data-index={banner.index} onclick={handleClick}>
+                                    <span>{banner.buttonLabel}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </template>
+            </div>
+
+            <template if:true={showNavButtons}>
+                <button class="nav-btn prev" onclick={prevSlide} >&#10094;</button>
+                <button class="nav-btn next" onclick={nextSlide} >&#10095;</button>
+            </template>
+
+            <template if:true={showDots}>
+                <div class="dot-navigation">
+                    <template for:each={banners} for:item="dot">
+                        <span 
+                            key={dot.Id} 
+                            class={dot.dotClass} 
+                            data-index={dot.index} 
+                            onclick={handleDotClick}>
+                        </span>
+                    </template>
+                </div>
+            </template>
+        </template>
+
+        <template if:true={showEmpty}>
+            <div class="empty-state-fallback">
+                <p>No premium offers available for your tier right now.</p>
+            </div>
+        </template>
+
+    </div>
+</template>   
+
+vimport { LightningElement, wire, api } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
+import getActiveBanners from '@salesforce/apex/PromotionBannerService.fetchActiveBanners';
+
+export default class PromotionBannerSlider extends NavigationMixin(LightningElement) {
+
+    @api defaultBuyerGroup;
+    @api autoSlideInterval = 5000;
+    @api showDots = false;
+    @api showNavButtons = false;
+    @api bannerHeight = '420px';
+
+    banners = [];
+    isLoading = true;
+    hasError = false;
+
+    currentIndex = 0;
+    _slideInterval = null;
+    _wiredResult = null;
+
+    connectedCallback() {
+        this.template.host.style.setProperty('--banner-height', this.bannerHeight);
+    }
+
+    disconnectedCallback() {
+        this._clearInterval();
+    }
+
+    @wire(getActiveBanners, { buyerGroup: '$defaultBuyerGroup' })
+    wiredBanners(result) {
+        this._wiredResult = result;
+        const { data, error } = result;
+
+        if (data) {
+            this.isLoading = false;
+            this.hasError = false;
+
+            if (data.length === 0) {
+                this.banners = [];
+                return;
+            }
+
+            this.banners = data.map((b, i) => {
+                let targetProductId = null;
+                let webUrlPath = null;
+
+                const rawUrlField = b.KV_Product_URL__c
+                    ? b.KV_Product_URL__c.trim()
+                    : '';
+
+                if (rawUrlField) {
+                    const idMatch = rawUrlField.match(/01t[a-zA-Z0-9]{12,15}/);
+
+                    if (idMatch) {
+                        targetProductId = idMatch[0];
+                    } else if (
+                        rawUrlField.startsWith('/') ||
+                        rawUrlField.startsWith('http')
+                    ) {
+                        webUrlPath = rawUrlField;
+                    }
+                } else if (b.Product_Id__c) {
+                    targetProductId = b.Product_Id__c;
+                }
+
+                return {
+                    ...b,
+                    imageUrl: b.KV_Image_URL__c,
+                    productId: targetProductId,
+                    externalUrl: webUrlPath,
+                    headline: b.KV_Headline__c || b.KV_Promotion__r?.Name || '',
+                    subText: b.KV_Sub_Text__c || '',
+                    buttonLabel: b.KV_Button_Label__c || 'Shop Now',
+                    promoName: b.KV_Promotion__r?.Name || '',
+
+                    startDatetime: b.KV_Promotion__r?.StartDateTime || '',
+                    endDatetime: b.KV_Promotion__r?.EndDateTime || '',
+                    startDate: b.KV_Promotion__r?.StartDate || '',
+                    endDate: b.KV_Promotion__r?.EndDate || '',
+
+                    isActive: i === 0,
+                    slideClass: i === 0 ? 'slide active' : 'slide',
+                    dotClass: i === 0 ? 'dot active' : 'dot',
+                    index: i
+                };
+            });
+
+            this.currentIndex = 0;
+            this._startAutoSlide();
+
+        } else if (error) {
+            this.isLoading = false;
+            this.hasError = true;
+
+            console.error('Error loading promotion banners:', error);
+        }
+    }
+
+    get hasBanners() {
+        return this.banners.length > 0;
+    }
+
+    get showEmpty() {
+        return !this.isLoading && !this.hasError && !this.hasBanners;
+    }
+
+    nextSlide() {
+        if (!this.hasBanners) return;
+
+        this.currentIndex =
+            (this.currentIndex + 1) % this.banners.length;
+
+        this._updateSlide();
+    }
+
+    prevSlide() {
+        if (!this.hasBanners) return;
+
+        this.currentIndex =
+            (this.currentIndex - 1 + this.banners.length) %
+            this.banners.length;
+
+        this._updateSlide();
+    }
+
+    handleDotClick(event) {
+        const idx = parseInt(event.currentTarget.dataset.index, 10);
+
+        if (!isNaN(idx)) {
+            this.currentIndex = idx;
+            this._updateSlide();
+            this._startAutoSlide();
+        }
+    }
+
+    handleMouseEnter() {
+        this._clearInterval();
+    }
+
+    handleMouseLeave() {
+        this._startAutoSlide();
+    }
+
+    handleClick(event) {
+        const index = parseInt(event.currentTarget.dataset.index, 10);
+        const banner = this.banners[index];
+
+        if (!banner) return;
+
+        if (banner.productId) {
+            this[NavigationMixin.Navigate]({
+                type: 'standard__recordPage',
+                attributes: {
+                    recordId: banner.productId,
+                    objectApiName: 'Product2',
+                    actionName: 'view'
+                }
+            });
+        }
+        else if (banner.externalUrl) {
+            window.location.href = banner.externalUrl;
+        }
+    }
+
+    _updateSlide() {
+        this.banners = this.banners.map((b, i) => ({
+            ...b,
+            isActive: i === this.currentIndex,
+            slideClass:
+                i === this.currentIndex
+                    ? 'slide active'
+                    : 'slide',
+            dotClass:
+                i === this.currentIndex
+                    ? 'dot active'
+                    : 'dot'
+        }));
+    }
+
+    _startAutoSlide() {
+        this._clearInterval();
+
+        if (this.banners.length > 1) {
+            this._slideInterval = setInterval(() => {
+                this.nextSlide();
+            }, this.autoSlideInterval);
+        }
+    }
+
+    _clearInterval() {
+        if (this._slideInterval) {
+            clearInterval(this._slideInterval);
+            this._slideInterval = null;
+        }
+    }
+}   
+
+
+:host {
+    --banner-height: 420px;        
+    --slide-duration: 0.7s;
+    --overlay-color: rgba(0, 0, 0, 0.38);
+    --accent-color: #ffffff;
+    --btn-bg: #ffffff;
+    --btn-text: #111111;
+    --dot-size: 10px;
+    --dot-active-color: #000000;
+    --dot-inactive-color: rgba(19, 29, 220, 0.45);
+    display: block;
+    width: 100%;
+}
+
+
+.carousel-container {
+    position: relative;
+    width: 100%;
+    height: var(--banner-height);
+    overflow: hidden;
+    background: #1a1a2e;
+    border-radius: 8px;
+    user-select: none;
+}
+
+.carousel-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+
+
+.slide {
+    position: absolute;
+    inset: 0;                      
+    opacity: 0;
+    transform: scale(1.04);
+    transition:
+        opacity var(--slide-duration) ease,
+        transform var(--slide-duration) ease;
+    pointer-events: none;
+}
+
+.slide.active {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+
+.slide-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+.slide-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.65) 0%,
+        rgba(0, 0, 0, 0.2) 60%,
+        rgba(0, 0, 0, 0.05) 100%
+    );
+}
+
+
+.overlay-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 5% 0 6%;
+    max-width: 55%;
+    gap: 10px;
+    margin-left: 10px;
+}
+
+
+.promo-pill-badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--accent-color);
+    margin: 0;
+    background: rgba(255, 255, 255, 0.12);
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 3px;
+    width: fit-content;
+}
+
+.headline-text {
+    font-size: clamp(1.6rem, 3.2vw, 2.6rem);
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1.2;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+.sub-text {
+    font-size: clamp(0.85rem, 1.5vw, 1.05rem);
+    color: rgba(255, 255, 255, 0.88);
+    margin: 0;
+    line-height: 1.5;
+    max-width: 420px;
+}
+
+.banner-expiry-text {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.65);
+    margin: 0;
+}
+
+
+.action-button {
+    margin-top: 8px;
+    padding: 12px 28px;
+    width: fit-content;
+    background: var(--btn-bg);
+    color: var(--btn-text);
+    border: none;
+    border-radius: 4px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.action-button:hover {
+    background: black;
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.action-button:active {
+    transform: translateY(0px);
+}
+
+.btn-arrow-icon {
+    display: inline-block;
+}
+
+
+.nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(6px);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.nav-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: translateY(-50%) scale(1.08);
+}
+
+.nav-btn.prev { left: 16px; }
+.nav-btn.next { right: 16px; }
+
+
+.dot-navigation {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    z-index: 10;
+}
+
+
+
+.dot{
+    width: var(--dot-size);
+    height: var(--dot-size);
+    border-radius: 50%;
+    background: var(--dot-inactive-color);
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.3s ease;
+    border: none;
+    display: inline-block;
+}
+
+.dot.active  {
+    background: var(--dot-active-color);
+    transform: scale(1.3);
+}
+
+
+.spinner-container {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    background: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.empty-state-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+    font-size: 0.95rem;
+    background: #f8f8f8;
+    border-radius: 8px;
+    border: 1px dashed #ddd;
+    text-align: center;
+    padding: 20px;
+}
+
+@media (max-width: 768px) {
+    .overlay-content {
+        max-width: 80%;
+        padding: 0 5%;
+        gap: 7px;
+    }
+
+    .nav-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    :host {
+        --banner-height: 260px;
+    }
+
+    .overlay-content {
+        max-width: 95%;
+    }
+
+    .headline-text {
+        font-size: 1.3rem;
+    }
+
+    .action-button {
+        padding: 9px 18px;
+        font-size: 0.82rem;
+    }
+    
+    .dot-navigation {
+        bottom: 8px;
+    }
+} 
