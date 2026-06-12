@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+    <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+</LightningComponentBundle> 
+
+<template>
+    <div class="report-container">
+
+        <div class="report-header">
+            <h1 class="report-title">Buyer Users</h1>
+            <span class="total-count">{totalUsers}</span>
+        </div>
+
+        <template if:true={isLoading}>
+            <div class="center-state">
+                <lightning-spinner alternative-text="Loading..." size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:true={errorMessage}>
+            <div class="center-state">
+                <p class="error-text">{errorMessage}</p>
+            </div>
+        </template>
+
+        <template if:true={isEmpty}>
+            <div class="center-state">
+                <p class="muted-text">No buyer users found under your account.</p>
+            </div>
+        </template>
+
+        <template if:true={showUsers}>
+            <ul class="user-list">
+                <template for:each={filteredUsers} for:item="user">
+                    <li key={user.userId} class="user-row">
+                        <div class="user-info">
+                            <p class="user-name">{user.name}</p>
+                            <p class="user-email">{user.email}</p>
+                        </div>
+                        <template if:true={user.isActive}>
+                            <span class="badge active">Active</span>
+                        </template>
+                        <template if:false={user.isActive}>
+                            <span class="badge inactive">Inactive</span>
+                        </template>
+                    </li>
+                </template>
+            </ul>
+        </template>
+
+    </div>
+</template>
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>65.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+    <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+</LightningComponentBundle> 
+
+
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.report-container {
+    font-family: 'Salesforce Sans', Arial, sans-serif;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    overflow: hidden;
+    width: 100%;
+}
+
+.report-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fb;
+}
+
+.report-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.total-count {
+    background: #0070d2;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+}
+
+.user-list { list-style: none; }
+
+.user-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.1s;
+}
+
+.user-row:last-child { border-bottom: none; }
+.user-row:hover { background: #f8f9fb; }
+
+.user-info { flex: 1; min-width: 0; }
+
+.user-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-email {
+    font-size: 0.78rem;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+.badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.badge.active   { background: #eaf5ea; color: #2e7d32; }
+.badge.inactive { background: #fdecea; color: #c62828; }
+
+.center-state {
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.muted-text { color: #888;    font-size: 0.85rem; }
+.error-text { color: #c23934; font-size: 0.85rem; }
+
+@media (max-width: 480px) {
+    .user-row  { padding: 12px 14px; }
+    .user-name { font-size: 0.85rem; }
+    .user-email{ font-size: 0.72rem; }
+}
