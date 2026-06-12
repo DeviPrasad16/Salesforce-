@@ -1,0 +1,66 @@
+
+public without sharing class OrderCommentService {
+
+    @AuraEnabled
+    public static String saveOrderComment(String orderNumber, String comment) {
+        if (String.isBlank(orderNumber)) {
+            throw new AuraHandledException('Order Number is required.');
+        }
+        if (String.isBlank(comment)) {
+            throw new AuraHandledException('Comment cannot be empty.');
+        }
+        try {
+            List<OrderSummary> summaries = [
+                SELECT OriginalOrderId
+                FROM   OrderSummary
+                WHERE  OrderNumber = :orderNumber
+                WITH   SECURITY_ENFORCED
+                LIMIT  1
+            ];
+            if (summaries.isEmpty()) {
+                throw new AuraHandledException('No order found for order number: ' + orderNumber);
+            }
+            if (summaries[0].OriginalOrderId == null) {
+                throw new AuraHandledException('Order summary has no linked order.');
+            }
+
+            List<Order> orders = [
+                SELECT Id, Checkout_Comment__c
+                FROM   Order
+                WHERE  Id = :summaries[0].OriginalOrderId
+                WITH   SECURITY_ENFORCED
+                LIMIT  1
+            ];
+            if (orders.isEmpty()) {
+                throw new AuraHandledException('Linked order record not found.');
+            }
+
+            Order order  = orders[0];
+            String entry = formatEntry(comment);
+
+            order.Checkout_Comment__c = String.isBlank(order.Checkout_Comment__c)
+                ? entry
+                : order.Checkout_Comment__c + '\n\n' + entry;
+
+            update order;
+            return order.Checkout_Comment__c;
+
+        } catch (AuraHandledException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AuraHandledException('Error saving comment: ' + e.getMessage());
+        }
+    }
+
+
+    private static String formatEntry(String comment) {
+        return String.format(
+            '[{0}] {1}\n{2}',
+            new List<Object>{
+                Datetime.now().format('yyyy-MM-dd HH:mm:ss'),
+                UserInfo.getName(),
+                comment.trim()
+            }
+        );
+    }
+}
