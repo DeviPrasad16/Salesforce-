@@ -1,0 +1,137 @@
+public without sharing class PromotionBannerService {
+
+    @AuraEnabled(cacheable=true)
+    public static List<KV_Promotion_Banner__c> fetchActiveBanners(String buyerGroup) {
+
+        try {
+            Date todayDate = Date.today();
+
+            List<KV_Promotion_Banner__c> bannerList =
+                new List<KV_Promotion_Banner__c>();
+
+            if (String.isNotBlank(buyerGroup)) {
+
+                String targetId = buyerGroup.trim();
+
+            
+                if (targetId.length() >= 15 &&
+                    targetId.startsWith('001')) {
+
+                    Set<Id> buyerGroupIds = new Set<Id>();
+
+                    for (
+                        BuyerGroupMember member :
+                        [
+                            SELECT BuyerGroupId
+                            FROM BuyerGroupMember
+                            WHERE BuyerId = :targetId
+                        ]
+                    ) {
+                        buyerGroupIds.add(member.BuyerGroupId);
+                    }
+
+                    if (!buyerGroupIds.isEmpty()) {
+
+                        bannerList = [
+                            SELECT
+                                Id,
+                                Name,
+                                KV_Headline__c,
+                                KV_Sub_Text__c,
+                                KV_Button_Label__c,
+                                KV_Sort_Order__c,
+                                KV_Image_URL__c,
+                                Buyer_Group__c,
+                                Product_Id__c,
+                                KV_Product_URL__c,
+                                KV_Promotion__r.Name,
+                                KV_Promotion__r.StartDateTime,
+                                KV_Promotion__r.EndDateTime,
+                                KV_Promotion__r.StartDate,
+                                KV_Promotion__r.EndDate
+                            FROM KV_Promotion_Banner__c
+                            WHERE Buyer_Group__c IN :buyerGroupIds
+                            ORDER BY KV_Sort_Order__c ASC NULLS LAST
+                            LIMIT 6
+                        ];
+                    }
+                }
+
+            
+                else if (
+                    targetId.length() >= 15 &&
+                    targetId.startsWith('00I')
+                ) {
+
+                    bannerList = [
+                        SELECT
+                            Id,
+                            Name,
+                            KV_Headline__c,
+                            KV_Sub_Text__c,
+                            KV_Button_Label__c,
+                            KV_Sort_Order__c,
+                            KV_Image_URL__c,
+                            Buyer_Group__c,
+                            Product_Id__c,
+                            KV_Product_URL__c,
+                            KV_Promotion__r.Name,
+                            KV_Promotion__r.StartDateTime,
+                            KV_Promotion__r.EndDateTime,
+                            KV_Promotion__r.StartDate,
+                            KV_Promotion__r.EndDate
+                        FROM KV_Promotion_Banner__c
+                        WHERE Buyer_Group__c = :targetId
+                        ORDER BY KV_Sort_Order__c ASC NULLS LAST
+                        LIMIT 6
+                    ];
+                }
+
+                
+                else {
+
+                    String searchGroup = '%' + targetId + '%';
+
+                    bannerList = [
+                        SELECT
+                            Id,
+                            Name,
+                            KV_Headline__c,
+                            KV_Sub_Text__c,
+                            KV_Button_Label__c,
+                            KV_Sort_Order__c,
+                            KV_Image_URL__c,
+                            Buyer_Group__c,
+                            Product_Id__c,
+                            KV_Product_URL__c,
+                            KV_Promotion__r.Name,
+                            KV_Promotion__r.StartDateTime,
+                            KV_Promotion__r.EndDateTime,
+                            KV_Promotion__r.StartDate,
+                            KV_Promotion__r.EndDate
+                        FROM KV_Promotion_Banner__c
+                        WHERE Buyer_Group__r.Name LIKE :searchGroup
+                        ORDER BY KV_Sort_Order__c ASC NULLS LAST
+                        LIMIT 6
+                    ];
+                }
+            }
+
+         
+           
+
+            return bannerList;
+
+        } catch (Exception e) {
+
+            throw new AuraHandledException(
+                'Failed to load promotion banners: ' +
+                e.getMessage()
+            );
+        }
+    }
+} 
+
+
+
+
