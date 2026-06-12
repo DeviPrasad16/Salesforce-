@@ -1,0 +1,74 @@
+public without sharing class BuyerUsersReportController {
+
+    public class BuyerUserWrapper {
+        @AuraEnabled public String  userId;
+        @AuraEnabled public String  name;
+        @AuraEnabled public String  email;
+        @AuraEnabled public Boolean isActive;
+    }
+
+    @AuraEnabled(cacheable=false)
+    public static List<BuyerUserWrapper> getBuyerUsers() {
+        List<BuyerUserWrapper> results = new List<BuyerUserWrapper>();
+
+        try {
+            Id currentUserId = UserInfo.getUserId();
+
+            
+            User currentUser = [
+                SELECT Id, Name, ContactId,
+                       Contact.AccountId,
+                       Kv_Is_Buyer_Manager__c
+                FROM User
+                WHERE Id = :currentUserId
+                LIMIT 1
+            ];
+
+            if (currentUser.ContactId == null) {
+                throw new AuraHandledException('No Contact linked to the logged-in user.');
+            }
+
+            if (!currentUser.Kv_Is_Buyer_Manager__c) {
+                throw new AuraHandledException('Logged-in user is not a Buyer Manager.');
+            }
+
+            Id accountId = currentUser.Contact.AccountId;
+            if (accountId == null) {
+                throw new AuraHandledException('No Account linked to the logged-in user Contact.');
+            }
+
+            
+          List<User> buyers = [
+                SELECT Id, Name, Email, IsActive, KV_isBuyer__c
+                FROM User
+                WHERE Contact.AccountId = :accountId
+                AND KV_isBuyer__c = true
+                
+                AND Id != :currentUserId
+                ORDER BY Name ASC
+            ];
+
+            
+
+           
+            for (User users : buyers) {
+                BuyerUserWrapper row = new BuyerUserWrapper();
+                row.userId        = users.Id;
+                row.name          = users.Name;
+                row.email         = users.Email;
+                row.isActive      = users.IsActive;
+                results.add(row);
+            }
+
+          
+
+        } catch (AuraHandledException e) {
+            throw e;
+        } catch (Exception e) {
+            
+            throw new AuraHandledException('Error: ' + e.getMessage());
+        }
+
+        return results;
+    }
+}
