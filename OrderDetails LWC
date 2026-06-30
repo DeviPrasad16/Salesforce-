@@ -1,0 +1,588 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Order Details</masterLabel>
+    <description>Shows order summary and purchased items, with quantities displayed as tier names read from the shared tier record.</description>
+    <targets>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightningCommunity__Default">
+            <property name="tiersConfigJson"
+                      type="String"
+                      label="Quantity Tiers (managed centrally — leave blank)"/>
+        </targetConfig>
+    </targetConfigs>
+ 
+</LightningComponentBundle>   
+
+.loading-state,
+.error-state,
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    gap: 12px;
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+}
+
+.error-state { color: #a32d2d; }
+
+.tab-content {
+    background: #ffffff;
+    border: 1px solid #e8e6df;
+    border-radius: 14px;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.table-card-header {
+    padding: 16px 20px;
+}
+
+.table-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: fixed;
+}
+
+.items-table thead {
+    background: #f5f4ef;
+    border-top: 1px solid #e8e6df;
+    border-bottom: 1px solid #e8e6df;
+}
+
+.items-table th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #999;
+    white-space: nowrap;
+}
+
+.items-table td {
+    padding: 14px 16px;
+    vertical-align: middle;
+    color: #1a1a1a;
+    border-bottom: 1px solid #f0ede6;
+}
+
+.items-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.items-table tbody tr:hover {
+    background: #faf9f6;
+    transition: background-color 0.15s ease;
+}
+
+.col-image      { width: 60px; }
+.col-name       { width: 160px; }
+.col-sku        { width: 110px; }
+.col-category   { width: 120px; }
+.col-desc       { width: 180px; }
+.col-client-code{ width: 110px; }
+.col-qty        { width: 130px; }
+.col-price      { width: 140px; }
+.col-total      { width: 110px; }
+
+.image-cell { width: 60px; }
+
+.image-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid #e8e6df;
+    background: #f5f4ef;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.product-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.name-cell {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1a1a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sku-cell {
+    font-size: 12px;
+    color: #888;
+}
+
+.category-cell {
+    font-size: 13px;
+    color: #1a1a1a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.desc-cell {
+    width: 180px;
+    min-width: 180px;
+    max-width: 180px;
+    padding: 8px 16px;
+    vertical-align: top;
+}
+
+.desc-scroll {
+    height: 80px;
+    overflow-y: auto;
+    font-size: 12px;
+    color: #555;
+    line-height: 1.6;
+    padding-right: 4px;
+    word-break: break-word;
+    white-space: normal;
+}
+
+.desc-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.desc-scroll::-webkit-scrollbar-track {
+    background: #f5f4ef;
+    border-radius: 4px;
+}
+
+.desc-scroll::-webkit-scrollbar-thumb {
+    background: #d0cec7;
+    border-radius: 4px;
+}
+
+.desc-scroll::-webkit-scrollbar-thumb:hover {
+    background: #b0ada6;
+}
+
+
+.client-code-cell {
+    font-size: 12px;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.qty-text {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1a1a;
+    white-space: nowrap;
+}
+
+.price {
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+.price-na {
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    font-style: italic;
+    color: #888;
+}
+
+.align-center { text-align: center; }
+.align-right  { text-align: right; }
+
+@media (max-width: 600px) {
+    .items-table th,
+    .items-table td {
+        padding: 12px 10px;
+    }
+
+    .image-wrap {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+    }
+
+    .price,
+    .price-na {
+        font-size: 13px;
+    }
+
+    
+    .desc-cell {
+        width: 140px;
+        min-width: 140px;
+        max-width: 140px;
+        padding: 6px 10px;
+    }
+
+    .desc-scroll {
+        height: 70px;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+    
+}
+
+
+import { LightningElement, api, wire } from 'lwc';
+import { CurrentPageReference } from 'lightning/navigation';
+
+import getOrderDetails from '@salesforce/apex/OrderDetailsController.getOrderDetails';
+import getOrderItems from '@salesforce/apex/OrderDetailsController.getOrderItems';
+import getQuantityTiers from '@salesforce/apex/OrderDetailsController.getQuantityTiers';
+
+import { getProduct } from 'commerce/productApi';
+import LOCALE from '@salesforce/i18n/locale';
+import CURRENCY from '@salesforce/i18n/currency';
+
+const formatCurrency = (amount) =>
+    new Intl.NumberFormat(LOCALE, {
+        style: 'currency',
+        currency: CURRENCY
+    }).format(amount || 0);
+
+const isShipping = (item) =>
+    item.productFamily === 'Shipping' ||
+    item.type === 'Shipping' ||
+    item.itemType === 'Shipping' ||
+    (item.productName || '').toLowerCase().includes('shipping');
+
+export default class OrderDetails extends LightningElement {
+
+    @api recordId;
+    @api tiersConfigJson = '';
+
+    order = null;
+    items = [];
+    isLoading = true;
+    hasError = false;
+    errorMessage = '';
+
+    _tiers = [];
+
+    @wire(CurrentPageReference)
+    pageRef;
+
+    get orderSummaryId() {
+        return (
+            this.recordId ||
+            this.pageRef?.state?.recordId ||
+            this.pageRef?.state?.id ||
+            this.pageRef?.state?.orderSummaryId ||
+            this.pageRef?.attributes?.recordId
+        );
+    }
+
+    connectedCallback() {
+        setTimeout(() => {
+            console.log('Order Summary Id =>', this.orderSummaryId);
+            this.loadAll();
+        }, 400);
+    }
+
+    async loadAll() {
+        const orderSummaryId = this.orderSummaryId;
+
+        if (!orderSummaryId) {
+            this.hasError = true;
+            this.errorMessage = 'Order Summary Id not found.';
+            this.isLoading = false;
+            return;
+        }
+
+        this.isLoading = true;
+        this.hasError = false;
+
+        try {
+            const [orderData, itemsData, tiersData] = await Promise.all([
+                getOrderDetails({ orderSummaryId }),
+                getOrderItems({ orderSummaryId }),
+                getQuantityTiers()
+            ]);
+
+            this.order = orderData;
+            this._tiers = this._normalizeTiers(tiersData || []);
+            this.items = this.mapItems(itemsData || []);
+            await this.loadProductData();
+
+        } catch (error) {
+            console.error('Apex Error:', error);
+            this.hasError = true;
+            this.errorMessage =
+                error?.body?.message ||
+                error?.message ||
+                'An unexpected error occurred.';
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    mapItems(rawItems) {
+        return rawItems
+            .filter(item => !isShipping(item))
+            .map(item => ({
+                ...item,
+                imageUrl: null,
+                hasImage: false,
+                tierText: this._tierText(item.quantity),
+                formattedUnitPrice: formatCurrency(item.unitPrice),
+                formattedTotalPrice: formatCurrency(item.totalPrice),
+                formattedUnitPriceExclVAT: formatCurrency(item.unitPriceExclVAT),
+                formattedUnitPriceInclVAT: formatCurrency(item.unitPriceInclVAT)
+            }));
+    }
+
+    async loadProductData() {
+        const updatedItems = [];
+
+        for (const item of this.items) {
+            try {
+                if (!item.productId) {
+                    updatedItems.push(item);
+                    continue;
+                }
+
+                const product = await getProduct({
+                    productId: item.productId
+                });
+
+                updatedItems.push({
+                    ...item,
+                    imageUrl:
+                        product?.defaultImage?.url ||
+                        product?.defaultImage?.contentUrl ||
+                        null,
+                    hasImage: !!(
+                        product?.defaultImage?.url ||
+                        product?.defaultImage?.contentUrl
+                    )
+                });
+
+            } catch (error) {
+                console.error('Product API Error', item.productName, error);
+                updatedItems.push({
+                    ...item,
+                    imageUrl: null,
+                    hasImage: false
+                });
+            }
+        }
+
+        this.items = updatedItems;
+    }
+
+    handleImageError(event) {
+        event.target.style.display = 'none';
+    }
+
+    get hasData() {
+        return !this.isLoading && !this.hasError && this.order != null;
+    }
+
+    get itemCount() {
+        return this.items.reduce((runningCount, item) => runningCount + (item.quantity || 0), 0);
+    }
+
+    get itemsEmpty() {
+        return this.items.length === 0;
+    }
+
+    get formattedTotal() {
+        return this.order?.totalAmount ? formatCurrency(this.order.totalAmount) : '$0.00';
+    }
+
+    get orderTotal() {
+        const totalPrice = this.items.reduce(
+            (runningTotal, item) => runningTotal + (item.totalPrice || 0),
+            0
+        );
+        return formatCurrency(totalPrice);
+    }
+
+    get statusClass() {
+        return this.order?.statusClass || 'status-badge status-draft';
+    }
+
+    _normalizeTiers(rows) {
+        const cleanedTiers = (rows || [])
+            .filter(tier => tier && tier.label)
+            .map(tier => ({
+                label: tier.label,
+                max: (tier.max === null || tier.max === undefined) ? null : Number(tier.max)
+            }));
+
+        cleanedTiers.sort((tierA, tierB) => {
+            if (tierA.max === null) return 1;
+            if (tierB.max === null) return -1;
+            return tierA.max - tierB.max;
+        });
+
+        return cleanedTiers;
+    }
+
+    _resolveTier(quantity) {
+        const tierList = this._tiers || [];
+
+        if (!tierList.length) return null;
+
+        for (const tier of tierList) {
+            if (tier.max === null) return tier;
+            if (quantity <= tier.max) return tier;
+        }
+
+        return tierList[tierList.length - 1];
+    }
+
+    _tierText(quantity) {
+        const safeQuantity = quantity || 0;
+        const tier = this._resolveTier(safeQuantity);
+        return tier ? (tier.label + ' of ' + safeQuantity) : String(safeQuantity);
+    }
+     
+}   
+
+
+<template>
+
+    <template if:true={isLoading}>
+        <div class="loading-state">
+            <lightning-spinner alternative-text="Loading order details" size="medium">
+            </lightning-spinner>
+        </div>
+    </template>
+
+    <template if:true={hasError}>
+        <div class="error-state">
+            <lightning-icon icon-name="utility:error" variant="error" size="small">
+            </lightning-icon>
+            <p>{errorMessage}</p>
+        </div>
+    </template>
+
+    <template if:true={hasData}>
+
+        <div class="tab-content">
+
+            <div class="table-card-header">
+                <span class="table-card-title">Purchased Items</span>
+            </div>
+
+            <template if:true={itemsEmpty}>
+                <div class="empty-state">
+                    <lightning-icon icon-name="utility:product" size="medium">
+                    </lightning-icon>
+                    <p>No purchased items found for this order.</p>
+                </div>
+            </template>
+
+            <template if:false={itemsEmpty}>
+                <div class="table-container">
+                    <table class="items-table">
+
+                        <thead>
+                            <tr>
+                                <th class="col-image">Product Image</th>
+                                <th class="col-name">Product Name</th>
+                                <th class="col-sku">SKU</th>
+                                <th class="col-category">Category</th>
+                                <th class="col-desc">Description</th>
+                                <th class="col-client-code">Client Code</th>
+                                <th class="col-qty align-center">Qty</th>
+                                <th class="col-price align-right">Unit Price (Excl. VAT)</th>
+                                <th class="col-price align-right">Unit Price (Incl. VAT)</th>
+                                <th class="col-total align-right">Price</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <template for:each={items} for:item="item">
+                                <tr key={item.itemId} class="item-row">
+
+                                    <td class="image-cell">
+                                        <div class="image-wrap">
+                                            <template if:true={item.hasImage}>
+                                                <img src={item.imageUrl} alt={item.productName} class="product-image"
+                                                    onerror={handleImageError}>
+                                            </template>
+                                        </div>
+                                    </td>
+
+                                    <td class="name-cell">{item.productName}</td>
+
+                                    <td class="sku-cell">{item.productSku}</td>
+
+                                    <td class="category-cell">{item.productCategory}</td>
+
+                                    <td class="desc-cell">
+                                        <div class="desc-scroll">{item.productDescription}</div>
+                                        </td>
+
+                                    <td class="client-code-cell">{item.clientCode}</td>
+
+                                    <td class="align-center qty-text">{item.tierText}</td>
+
+                                    <td class="align-right">
+                                        <span class="price">{item.formattedUnitPriceExclVAT}</span>
+                                    </td>
+
+                                    <td class="align-right">
+                                        <template if:true={item.hasVAT}>
+                                            <span class="price">{item.formattedUnitPriceInclVAT}</span>
+                                        </template>
+                                        <template if:false={item.hasVAT}>
+                                            <span class="price-na">N/A</span>
+                                        </template>
+                                    </td>
+
+                                    <td class="align-right">
+                                        <span class="price">{item.formattedTotalPrice}</span>
+                                    </td>
+
+                                </tr>
+                            </template>
+                        </tbody>
+
+                    </table>
+                </div>
+            </template>
+
+        </div>
+
+    </template>
+
+
+</template>
