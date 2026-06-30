@@ -1,0 +1,6 @@
+trigger KV_OrderBudgetTrigger on Order (after update) {
+    KV_OrderBudgetTriggerHandler.deductBuyerBudget(
+        Trigger.new,
+        Trigger.oldMap
+    );
+}
