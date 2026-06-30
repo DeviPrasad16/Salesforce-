@@ -1,0 +1,103 @@
+public without sharing class KV_CheckoutBudgetController {
+
+    public class BudgetCheckResult {
+        @AuraEnabled public Boolean hasError;
+        @AuraEnabled public Boolean isCategoryError;
+        @AuraEnabled public Boolean isGenericCategoryError;
+        @AuraEnabled public Boolean isBuyerError;
+        @AuraEnabled public String  categoryName;
+        @AuraEnabled public Decimal categoryRemaining;
+        @AuraEnabled public Decimal categoryCartTotal;
+        @AuraEnabled public Decimal categoryOverBy;
+        @AuraEnabled public Decimal buyerCartTotal;
+        @AuraEnabled public Decimal buyerRemainingBudget;
+        @AuraEnabled public String  currencyIsoCode;
+
+        public BudgetCheckResult() {
+            this.hasError              = false;
+            this.isCategoryError       = false;
+            this.isGenericCategoryError= false;
+            this.isBuyerError          = false;
+        }
+    }
+
+    @AuraEnabled
+    public static BudgetCheckResult checkBudget(Id cartId) {
+        BudgetCheckResult result = new BudgetCheckResult();
+
+        if (cartId == null) return result;
+
+       
+        Map<Id, CheckoutCategoryBudgetValidator.BudgetViolation> violations =
+            CheckoutCategoryBudgetValidator.cartBudgetViolations(new Set<Id>{ cartId });
+
+        CheckoutCategoryBudgetValidator.BudgetViolation categoryViolation =
+            violations.get(cartId);
+
+        if (categoryViolation != null) {
+            result.hasError        = true;
+            result.isCategoryError = true;
+            result.currencyIsoCode = categoryViolation.currencyIsoCode;
+
+            if (categoryViolation.categoryName == null) {
+                result.isGenericCategoryError = true;
+            } else {
+                result.categoryName      = categoryViolation.categoryName;
+                result.categoryRemaining = categoryViolation.remaining;
+                result.categoryCartTotal = categoryViolation.cartTotal;
+                result.categoryOverBy    = categoryViolation.overBy;
+            }
+            return result;
+        }
+
+
+        User currentUser = [
+            SELECT ContactId
+            FROM   User
+            WHERE  Id = :UserInfo.getUserId()
+            LIMIT  1
+        ];
+
+        if (currentUser.ContactId == null) return result;
+
+        Contact buyerContact = [
+            SELECT KV_Contact_Limit__c,
+                   KV_Contact_Remaining_Amount__c,
+                   KV_Super_User__c
+            FROM   Contact
+            WHERE  Id = :currentUser.ContactId
+            LIMIT  1
+        ];
+
+        Decimal buyerRemaining = buyerContact.KV_Contact_Remaining_Amount__c == null
+                                 ? 0 : buyerContact.KV_Contact_Remaining_Amount__c;
+
+        result.buyerRemainingBudget = buyerRemaining;
+
+        if (buyerContact.KV_Contact_Limit__c == null ||
+            buyerContact.KV_Contact_Limit__c == 0) {
+            return result;
+        }
+
+        WebCart cart = [
+            SELECT Id, TotalAmount, GrandTotalAmount
+            FROM   WebCart
+            WHERE  Id = :cartId
+            LIMIT  1
+        ];
+
+        Decimal cartTotal = cart.GrandTotalAmount != null
+                            ? cart.GrandTotalAmount
+                            : (cart.TotalAmount != null ? cart.TotalAmount : 0);
+
+        result.buyerCartTotal = cartTotal;
+
+      
+        if (cartTotal > buyerRemaining && buyerContact.KV_Super_User__c != true) {
+            result.hasError      = true;
+            result.isBuyerError  = true;
+        }
+
+        return result;
+    }
+}
