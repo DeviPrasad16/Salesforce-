@@ -1,0 +1,80 @@
+trigger OrderApprovalTrigger on Order (after insert, before update, after update) {
+
+    if (Trigger.isInsert && Trigger.isAfter) {
+
+        Set<Id> ownerIds = new Set<Id>();
+        for (Order newOrder : Trigger.new) {
+            if (newOrder.OwnerId != null) ownerIds.add(newOrder.OwnerId);
+        }
+        if (ownerIds.isEmpty()) return;
+
+        List<PermissionSet> allPermSets = [
+            SELECT Id, Name FROM PermissionSet
+            WHERE  Name IN ('B2BBuyer', 'B2BBuyerManager')
+        ];
+
+        Id buyerPermSetId        = null;
+        Id buyerManagerPermSetId = null;
+        for (PermissionSet permSet : allPermSets) {
+            if (permSet.Name == 'B2BBuyerManager') {
+                buyerManagerPermSetId = permSet.Id;
+            } else {
+                buyerPermSetId = permSet.Id;
+            }
+        }
+
+        if (buyerPermSetId == null || buyerManagerPermSetId == null) return;
+
+        Map<Id, Set<Id>> userPermSetIdMap = new Map<Id, Set<Id>>();
+        for (PermissionSetAssignment permissionAssignment : [
+            SELECT AssigneeId, PermissionSetId
+            FROM   PermissionSetAssignment
+            WHERE  AssigneeId      IN :ownerIds
+            AND    PermissionSetId IN (:buyerPermSetId, :buyerManagerPermSetId)
+        ]) {
+            if (!userPermSetIdMap.containsKey(permissionAssignment.AssigneeId)) {
+                userPermSetIdMap.put(permissionAssignment.AssigneeId, new Set<Id>());
+            }
+            userPermSetIdMap.get(permissionAssignment.AssigneeId).add(permissionAssignment.PermissionSetId);
+        }
+
+        List<Id> buyerOrderIds   = new List<Id>();
+        List<Id> managerOrderIds = new List<Id>();
+
+        for (Order newOrder : Trigger.new) {
+            Set<Id> userPermIds = userPermSetIdMap.get(newOrder.OwnerId);
+            if (userPermIds != null && !userPermIds.isEmpty()) {
+                if (userPermIds.contains(buyerManagerPermSetId)) {
+                    managerOrderIds.add(newOrder.Id);
+                } else if (userPermIds.contains(buyerPermSetId)) {
+                    buyerOrderIds.add(newOrder.Id);
+                }
+            }
+        }
+
+        if (!buyerOrderIds.isEmpty())   OrderApprovalHelper.setPendingApproval(buyerOrderIds);
+        if (!managerOrderIds.isEmpty()) OrderApprovalHelper.setReadyForFulfilment(managerOrderIds);
+    }
+
+    if (Trigger.isUpdate && Trigger.isBefore) {
+        DateTime approvalTimestamp = DateTime.now();
+        Id       approvingUserId   = UserInfo.getUserId();
+
+        for (Order updatedOrder : Trigger.new) {
+            Order previousOrder = Trigger.oldMap.get(updatedOrder.Id);
+            Boolean wasApproved = (previousOrder.Status == 'Pending for Approval'
+                                && updatedOrder.Status  == 'Activated');
+            if (wasApproved) {
+                updatedOrder.Authorization_Date__c = approvalTimestamp;
+                updatedOrder.Authorization_Time__c = approvalTimestamp;
+                updatedOrder.Authorizing_User__c   = approvingUserId;
+            }
+        }
+    }
+
+    if (Trigger.isUpdate && Trigger.isAfter) {
+        OrderApprovalTriggerHandler.handleAfterUpdate(Trigger.new, Trigger.oldMap);
+        OrderBudgetRollbackHandler.handleAfterUpdate(Trigger.new, Trigger.oldMap);
+        
+    }
+} 
