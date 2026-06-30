@@ -1,0 +1,1046 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>KV Support Form</masterLabel>
+
+    <targets>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+
+    <targetConfigs>
+        <targetConfig targets="lightningCommunity__Default">
+
+      
+            <property name="pageTitle" type="String" label="Page Title"/>
+            <property name="backLabel" type="String" label="Back Button Label"/>
+            <property name="supportTitle" type="String" label="Support Heading"/>
+            <property name="contactSubtitle" type="String" label="Support Subtitle"/>
+            <property name="emailPlaceholder" type="String" label="Email Placeholder"/>
+            <property name="sendOtpLabel" type="String" label="Send OTP Button"/>
+            <property name="otpTitle" type="String" label="OTP Step Heading"/>
+            <property name="otpSubtitle" type="String" label="OTP Step Subtitle"/>
+            <property name="codePlaceholder" type="String" label="Code Placeholder"/>
+            <property name="namePlaceholder" type="String" label="Name Placeholder"/>
+            <property name="issuePlaceholder" type="String" label="Issue Placeholder"/>
+            <property name="submitLabel" type="String" label="Submit Button"/>
+            <property name="successTitle" type="String" label="Success Heading"/>
+            <property name="successMessage" type="String" label="Success Message"/>
+
+    
+            <property name="emailRequiredTitle" type="String" label="Toast: Email Required Title"/>
+            <property name="emailRequiredMessage" type="String" label="Toast: Email Required Message"/>
+            <property name="otpSentTitle" type="String" label="Toast: OTP Sent Title"/>
+            <property name="otpSentMessage" type="String" label="Toast: OTP Sent Message"/>
+            <property name="sendErrorTitle" type="String" label="Toast: Send Error Title"/>
+            <property name="sendErrorMessage" type="String" label="Toast: Send Error Message (fallback)"/>
+            <property name="missingInfoTitle" type="String" label="Toast: Missing Info Title"/>
+            <property name="missingInfoMessage" type="String" label="Toast: Missing Info Message"/>
+            <property name="submitSuccessTitle" type="String" label="Toast: Submit Success Title"/>
+            <property name="submitSuccessMessage" type="String" label="Toast: Submit Success Message"/>
+            <property name="submitErrorTitle" type="String" label="Toast: Submit Error Title"/>
+            <property name="submitErrorMessage" type="String" label="Toast: Submit Error Message (fallback)"/>
+            <property name="timeExpiredTitle" type="String" label="Toast: Time Expired Title"/>
+
+            
+            <property name="logoImage"
+                      type="ContentReference"
+                      label="Logo Image"
+                      description="Choose or upload the logo"/>
+
+            <property name="logoAlt"
+                      type="String"
+                      label="Logo Alt Text"/>
+
+            <property name="illustrationImage"
+                      type="ContentReference"
+                      label="Illustration Image"
+                      description="Choose or upload the left illustration"/>
+
+            <property name="illustrationAlt"
+                      type="String"
+                      label="Illustration Alt Text"/>
+
+            <property name="bellImage"
+                      type="ContentReference"
+                      label="Bell Image"
+                      description="Choose or upload the bell icon"/>
+
+            <property name="bellAlt"
+                      type="String"
+                      label="Bell Alt Text"/>
+
+         
+            <property name="logoWidth"
+                      type="Integer"
+                      label="Logo Width (px)"
+                      min="0"
+                      max="800"/>
+
+            <property name="logoHeight"
+                      type="Integer"
+                      label="Logo Height (px)"
+                      min="0"
+                      max="500"/>
+
+            <property name="logoMarginTop"
+                      type="Integer"
+                      label="Logo Margin Top (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="logoMarginRight"
+                      type="Integer"
+                      label="Logo Margin Right (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="logoMarginBottom"
+                      type="Integer"
+                      label="Logo Margin Bottom (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="logoMarginLeft"
+                      type="Integer"
+                      label="Logo Margin Left (px)"
+                      min="-300"
+                      max="300"/>
+      <property name="illustrationWidth"
+                      type="Integer"
+                      label="Illustration Width (px)"
+                      min="0"
+                      max="900"/>
+
+            <property name="illustrationHeight"
+                      type="Integer"
+                      label="Illustration Height (px)"
+                      min="0"
+                      max="900"/>
+
+            <property name="illustrationMarginTop"
+                      type="Integer"
+                      label="Illustration Margin Top (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="illustrationMarginRight"
+                      type="Integer"
+                      label="Illustration Margin Right (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="illustrationMarginBottom"
+                      type="Integer"
+                      label="Illustration Margin Bottom (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="illustrationMarginLeft"
+                      type="Integer"
+                      label="Illustration Margin Left (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="bellWidth"
+                      type="Integer"
+                      label="Bell Width (px)"
+                      min="0"
+                      max="300"/>
+
+            <property name="bellHeight"
+                      type="Integer"
+                      label="Bell Height (px)"
+                      min="0"
+                      max="300"/>
+
+            <property name="bellMarginTop"
+                      type="Integer"
+                      label="Bell Margin Top (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="bellMarginRight"
+                      type="Integer"
+                      label="Bell Margin Right (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="bellMarginBottom"
+                      type="Integer"
+                      label="Bell Margin Bottom (px)"
+                      min="-300"
+                      max="300"/>
+
+            <property name="bellMarginLeft"
+                      type="Integer"
+                      label="Bell Margin Left (px)"
+                      min="-300"
+                      max="300"/>
+
+     
+            <property name="backgroundColor"
+                      type="Color"
+                      label="Page Background"/>
+
+            <property name="titleColor"
+                      type="Color"
+                      label="Title / Link Color"/>
+
+            <property name="cardColor"
+                      type="Color"
+                      label="Card Color (top)"/>
+
+            <property name="cardColorDark"
+                      type="Color"
+                      label="Card Color (bottom)"/>
+
+            <property name="cardTextColor"
+                      type="Color"
+                      label="Card Text Color"/>
+
+            <property name="buttonColor"
+                      type="Color"
+                      label="Button Background"/>
+
+            <property name="buttonTextColor"
+                      type="Color"
+                      label="Button Text Color"/>
+
+            <property name="bodyTextColor"
+                      type="Color"
+                      label="Body / Back Text Color"/>
+
+            <property name="toastSuccessColor"
+                      type="Color"
+                      label="Toast Success Color"/>
+
+            <property name="toastWarningColor"
+                      type="Color"
+                      label="Toast Warning Color"/>
+
+            <property name="toastErrorColor"
+                      type="Color"
+                      label="Toast Error Color"/>
+
+            <property name="toastTextColor"
+                      type="Color"
+                      label="Toast Text Color"/>
+
+            <property name="fontFamily"
+                      type="String"
+                      label="Font Style"
+                      datasource="Salesforce Sans,Poppins,Inter,Roboto,Arial,Helvetica,Georgia,Times New Roman"/>
+
+            <property name="fontSize"
+                      type="Integer"
+                      label="Base Font Size (px)"
+                     />
+
+            <property name="titleFontSize"
+                      type="Integer"
+                      label="Title Font Size (px)"
+                     />
+
+            <property name="cardTitleFontSize"
+                      type="Integer"
+                      label="Card Heading Font Size (px)"
+                      />
+
+            <property name="subtitleFontSize"
+                      type="Integer"
+                      label="Subtitle Font Size (px)"
+                     />
+
+            <property name="fieldFontSize"
+                      type="Integer"
+                      label="Input Font Size (px)"
+                      />
+
+            <property name="buttonFontSize"
+                      type="Integer"
+                      label="Button Font Size (px)"
+                      />
+
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>
+
+
+
+import { LightningElement, api } from 'lwc';
+import { NavigationMixin } from 'lightning/navigation';
+import basePath from '@salesforce/community/basePath';
+import startValidation from '@salesforce/apex/KV_B2B_SupportController.startValidationProcess';
+import requestFinalSubmission from '@salesforce/apex/KV_B2B_SupportController.requestFinalSubmission';
+
+export default class KvB2BSupportForm extends NavigationMixin(LightningElement) {
+
+   
+    @api pageTitle;
+    @api backLabel ;
+    @api logoAlt;
+    @api supportTitle;
+    @api contactSubtitle;
+    @api emailPlaceholder;
+    @api sendOtpLabel;
+    @api otpTitle;
+    @api otpSubtitle;
+    @api codePlaceholder;
+    @api namePlaceholder;
+    @api issuePlaceholder ;
+    @api submitLabel ;
+    @api successTitle ;
+    @api successMessage;
+
+    
+    @api emailRequiredTitle ;
+    @api emailRequiredMessage ;
+    @api otpSentTitle;
+    @api otpSentMessage;
+    @api sendErrorTitle;
+    @api sendErrorMessage ;
+    @api missingInfoTitle ;
+    @api missingInfoMessage ;
+    @api submitSuccessTitle;
+    @api submitSuccessMessage ;
+    @api submitErrorTitle ;
+    @api submitErrorMessage;
+    @api timeExpiredTitle ;
+
+    
+    @api logoImage;
+    @api illustrationImage;
+    @api bellImage;
+    @api illustrationAlt ;
+    @api bellAlt ;
+
+    
+    @api backgroundColor;
+    @api titleColor;
+    @api cardColor;
+    @api cardColorDark;
+    @api cardTextColor;
+    @api buttonColor;
+    @api buttonTextColor;
+    @api bodyTextColor;
+    @api fontFamily;
+    @api fontSize;
+    @api titleFontSize;
+    @api cardTitleFontSize;
+    @api subtitleFontSize;
+    @api fieldFontSize;
+    @api buttonFontSize;
+
+    
+    @api toastSuccessColor;
+    @api toastWarningColor;
+    @api toastErrorColor;
+    @api toastTextColor;
+
+   
+    @api logoWidth; @api logoHeight;
+    @api logoMarginTop; @api logoMarginRight; @api logoMarginBottom; @api logoMarginLeft;
+    @api illustrationWidth; @api illustrationHeight;
+    @api illustrationMarginTop; @api illustrationMarginRight; @api illustrationMarginBottom; @api illustrationMarginLeft;
+    @api bellWidth; @api bellHeight;
+    @api bellMarginTop; @api bellMarginRight; @api bellMarginBottom; @api bellMarginLeft;
+
+    step = 1;
+    isLoading = false;
+    isFinished = false;
+    userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone; 
+
+    formData = {
+        email: '',
+        otp: '',
+        name: '',
+        issue: ''
+    };
+
+  
+    showToast = false;
+    toastTitle = '';
+    toastMessage = '';
+    toastVariant = 'info';
+    _toastTimer;
+
+    get toastClass() { return 'kv-toast kv-toast--' + this.toastVariant; }
+
+   
+    resolveImage(ref) {
+        if (!ref) return '';
+
+        if (typeof ref === 'string') {
+            const t = ref.trim();
+            if (!t) return '';
+            if (t.startsWith('http') || t.startsWith('/')) return t;
+           
+            return basePath + '/sfsites/c/cms/delivery/media/' + t;
+        }
+
+        if (typeof ref === 'object') {
+            return ref.url || ref.contentUrl || ref.imageUrl || ref.unauthenticatedUrl
+                || ref.source || ref.sourceUrl || ref.cdnUrl || ref.mediaUrl || '';
+        }
+        return '';
+    }
+
+    get logoUrl() { return this.resolveImage(this.logoImage); }
+    get illustrationUrl() { return this.resolveImage(this.illustrationImage); }
+    get bellUrl() { return this.resolveImage(this.bellImage); }
+
+    get isStep1() { return this.step === 1 && !this.isFinished; }
+    get cardwrapClass() { return this.isStep1 ? 'cardwrap cardwrap--lower' : 'cardwrap'; }
+    get isStep2() { return this.step === 2 && !this.isFinished; }
+    get showSuccess() { return this.isFinished; }
+
+   
+    renderedCallback() {
+        const setVar = (name, value) => {
+            if (value) this.style.setProperty(name, value);
+        };
+        setVar('--bg', this.backgroundColor);
+        setVar('--title-blue', this.titleColor);
+        setVar('--card-blue', this.cardColor);
+        setVar('--card-blue-dark', this.cardColorDark || this.cardColor);
+        setVar('--card-text', this.cardTextColor);
+        setVar('--btn-bg', this.buttonColor);
+        setVar('--btn-text', this.buttonTextColor);
+        setVar('--ink', this.bodyTextColor);
+        setVar('--toast-success', this.toastSuccessColor);
+        setVar('--toast-warning', this.toastWarningColor);
+        setVar('--toast-error', this.toastErrorColor);
+        setVar('--toast-text', this.toastTextColor);
+        if (this.fontFamily) {
+            this.style.setProperty('--ff', '"' + this.fontFamily + '", system-ui, sans-serif');
+        }
+        if (this.fontSize) {
+            this.style.setProperty('--fs', this.fontSize + 'px');
+        }
+        const setPx = (name, val) => {
+            if (val) this.style.setProperty(name, val + 'px');
+        };
+        setPx('--title-size', this.titleFontSize);
+        setPx('--card-title-size', this.cardTitleFontSize);
+        setPx('--sub-size', this.subtitleFontSize);
+        setPx('--field-size', this.fieldFontSize);
+        setPx('--btn-size', this.buttonFontSize);
+
+     
+        setPx('--logo-w', this.logoWidth);
+        setPx('--logo-h', this.logoHeight);
+        setPx('--logo-mt', this.logoMarginTop);
+        setPx('--logo-mr', this.logoMarginRight);
+        setPx('--logo-mb', this.logoMarginBottom);
+        setPx('--logo-ml', this.logoMarginLeft);
+       
+        setPx('--ill-w', this.illustrationWidth);
+        setPx('--ill-h', this.illustrationHeight);
+        setPx('--ill-mt', this.illustrationMarginTop);
+        setPx('--ill-mr', this.illustrationMarginRight);
+        setPx('--ill-mb', this.illustrationMarginBottom);
+        setPx('--ill-ml', this.illustrationMarginLeft);
+       
+        setPx('--bell-w', this.bellWidth);
+        setPx('--bell-h', this.bellHeight);
+        setPx('--bell-mt', this.bellMarginTop);
+        setPx('--bell-mr', this.bellMarginRight);
+        setPx('--bell-mb', this.bellMarginBottom);
+        setPx('--bell-ml', this.bellMarginLeft);
+    }
+
+    handleInputChange(event) {
+        const field = event.target.dataset.id;
+        this.formData = { ...this.formData, [field]: event.target.value };
+    }
+
+    handleSendOTP() {
+        if (!this.formData.email) {
+            this.fireToast(this.emailRequiredTitle, this.emailRequiredMessage, 'warning');
+            return;
+        }
+
+        this.isLoading = true;
+        startValidation({
+            userEmail: this.formData.email,
+            userTimezone: this.userTimezone
+        })
+            .then(() => {
+                this.step = 2;
+                this.fireToast(this.otpSentTitle, this.otpSentMessage, 'success');
+            })
+            .catch(error => {
+                this.fireToast(this.sendErrorTitle, error?.body?.message || this.sendErrorMessage, 'error');
+            })
+            .finally(() => { this.isLoading = false; });
+    }
+
+    handleSubmit() {
+        const { name, email, otp, issue } = this.formData;
+        if (!name || !otp || !issue) {
+            this.fireToast(this.missingInfoTitle, this.missingInfoMessage, 'warning');
+            return;
+        }
+
+        this.isLoading = true;
+        requestFinalSubmission({
+            name,
+            email,
+            otpInput: otp,
+            issue,
+            userTimezone: this.userTimezone
+        })
+            .then(() => {
+                this.fireToast(this.submitSuccessTitle, this.submitSuccessMessage, 'success');
+                this.isFinished = true;
+                setTimeout(() => this.redirectToLogin(), 1000);
+            })
+            .catch(error => {
+                const errorMsg = error?.body?.message || this.submitErrorMessage;
+                if (errorMsg.toLowerCase().includes('expired')) {
+                    this.fireToast(this.timeExpiredTitle, errorMsg, 'error');
+                    setTimeout(() => this.handleBack(), 2000);
+                } else {
+                    this.fireToast(this.submitErrorTitle, errorMsg, 'error');
+                }
+            })
+            .finally(() => { this.isLoading = false; });
+    }
+
+    redirectToLogin() {
+        this[NavigationMixin.Navigate]({
+            type: 'comm__namedPage',
+            attributes: { name: 'Login' }
+        });
+    }
+
+    fireToast(label, message, variant) {
+        this.toastTitle = label;
+        this.toastMessage = message;
+        this.toastVariant = variant || 'info';
+        this.showToast = true;
+        
+        clearTimeout(this._toastTimer);
+      
+        this._toastTimer = setTimeout(() => { this.showToast = false; }, 4000);
+    }
+
+    handleToastClose() {
+        this.showToast = false;
+        clearTimeout(this._toastTimer);
+    }
+
+    handleBack() {
+        this.step = 1;
+        this.formData = { ...this.formData, otp: '' };
+    }
+
+    handleCancel() {
+        this[NavigationMixin.Navigate]({
+            type: 'comm__namedPage',
+            attributes: { name: 'Login' }
+        });
+    }
+}
+
+<template>
+    <div class="page">
+        
+        <template if:true={showToast}>
+            <div class={toastClass} role="alert" aria-live="assertive">
+                <div class="kv-toast__body">
+                    <strong class="kv-toast__title">{toastTitle}</strong>
+                    <span class="kv-toast__msg">{toastMessage}</span>
+                </div>
+                <button class="kv-toast__close" type="button" onclick={handleToastClose} aria-label="Dismiss">&times;</button>
+            </div>
+        </template>
+
+      
+        <div class="header">
+            
+       <button class="back-link" type="button" onclick={handleCancel}>
+    <svg class="ico" viewBox="0 0 24 24">
+        <line x1="19" y1="12" x2="7" y2="12"></line>
+        <polyline points="12 7 7 12 12 17"></polyline>
+    </svg>
+</button>
+
+            <h1 class="page-title">{pageTitle}</h1>
+        </div>
+
+       
+        <div class="hero">
+            
+            <div class="brandcol">
+                <img class="logo-img" src={logoUrl} alt={logoAlt} />
+                <div class="illus-box">
+                    <img class="illustration-img" src={illustrationUrl} alt={illustrationAlt} />
+                </div>
+            </div>
+
+            <div class={cardwrapClass}>
+                <div class="card">
+                    <img class="bell-img" src={bellUrl} alt={bellAlt} />
+
+                   
+                    <template if:true={isStep1}>
+                        <h2 class="card-title">{supportTitle}</h2>
+                        <p class="card-sub">{contactSubtitle}</p>
+
+                        <input class="field" data-id="email" type="email" value={formData.email}
+                            oninput={handleInputChange} placeholder={emailPlaceholder}
+                            autocomplete="email" aria-label={emailPlaceholder} />
+
+                        <div class="actions">
+                            <button class="btn" type="button" onclick={handleSendOTP}>{sendOtpLabel}</button>
+                            <button class="btn" type="button" onclick={handleCancel}>{backLabel}</button>
+                        </div>
+                    </template>
+
+                  
+                    <template if:true={isStep2}>
+                        <h2 class="card-title">{otpTitle}</h2>
+                        <p class="card-sub">{otpSubtitle}</p>
+
+                        <input class="field" data-id="otp" type="text" inputmode="numeric" maxlength="6"
+                            value={formData.otp} oninput={handleInputChange}
+                            placeholder={codePlaceholder} aria-label={codePlaceholder} />
+
+                        <input class="field" data-id="name" type="text" value={formData.name}
+                            oninput={handleInputChange} placeholder={namePlaceholder}
+                            autocomplete="name" aria-label={namePlaceholder} />
+
+                        <textarea class="field area" data-id="issue" value={formData.issue}
+                            oninput={handleInputChange} placeholder={issuePlaceholder} rows="2"
+                            aria-label={issuePlaceholder}></textarea>
+
+                        <div class="actions">
+                            <button class="btn" type="button" onclick={handleSubmit}>{submitLabel}</button>
+                            <button class="btn" type="button" onclick={handleBack}>{backLabel}</button>
+                        </div>
+                    </template>
+
+                    
+                    <template if:true={showSuccess}>
+                        <div class="success">
+                            <svg class="check" viewBox="0 0 24 24" aria-hidden="true">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            <h2 class="card-title">{successTitle}</h2>
+                            <p class="card-sub">{successMessage}</p>
+                        </div>
+                    </template>
+
+                 
+                    <template if:true={isLoading}>
+                        <div class="overlay">
+                            <lightning-spinner alt-text="Processing" size="medium"></lightning-spinner>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+
+:host {
+    /* Colors */
+    --bg: #eef0f3;
+    --card-blue: #1a5fd6;
+    --card-blue-dark: #1450bd;
+    --title-blue: #1f6fe5;
+    --ink: #1d2433;
+    --ink-soft: #5a6373;
+    --line: #c9d3e0;
+    --field-border: rgba(255,255,255,0.55);
+    --field-bg: rgba(255,255,255,0.10);
+    --card-text: #ffffff;
+    --btn-bg: #ffffff;
+    --btn-text: var(--card-blue);
+
+    --toast-success: #2e844a;
+    --toast-warning: #fe9339;
+    --toast-error: #ea001e;
+    --toast-info: #1a5fd6;
+    --toast-text: #ffffff;
+
+    --ff: "Salesforce Sans", system-ui, -apple-system,
+          "Segoe UI", sans-serif;
+
+    --fs: 16px;
+    --title-size: clamp(22px, 5vw, 32px);
+    --card-title-size: clamp(24px, 2.4vw, 30px);
+    --sub-size: 15px;
+    --field-size: 16px;
+    --btn-size: 16px;
+
+    --logo-w: 260px;
+    --bell-w: 54px;
+    --bell-h: 54px;
+
+    display: block;
+    width: 100%;
+    background: var(--bg);
+    font-family: var(--ff);
+    font-size: var(--fs);
+    color: var(--ink);
+}
+
+.page {
+    max-width: 1450px;
+    margin: 0 auto;
+    padding: 8px 30px 0;
+}
+
+/* Header */
+
+.header {
+    width: 100%;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    color: var(--ink);
+    padding: 4px 0;
+}
+
+.back-link:hover {
+    color: var(--title-blue);
+}
+
+.back-link:focus-visible {
+    outline: 2px solid var(--title-blue);
+    outline-offset: 3px;
+}
+
+.ico {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.page-title {
+    text-align: center;
+    color: var(--title-blue);
+    font-weight: 800;
+    font-size: var(--title-size);
+    margin: 0 0 30px;
+}
+
+/* Layout */
+
+.hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 60px;
+    margin-bottom: 10px;
+}
+
+.brandcol {
+    flex: 1;
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.logo-img {
+    width: 100%;
+    max-width: 260px;
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
+
+    margin-left: -35px;   /* move logo left */
+    margin-bottom: 15px;
+
+    align-self: flex-start;
+}
+
+.illus-box {
+    width: 100%;
+    max-width: 500px;
+    height: 280px;
+    position: relative;
+}
+
+.illustration-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+/* Card */
+
+.cardwrap {
+    flex: 1;
+    max-width: 720px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.card {
+    position: relative;
+    width: 100%;
+    max-width: 720px;
+    background: linear-gradient(
+        160deg,
+        var(--card-blue),
+        var(--card-blue-dark)
+    );
+    border-radius: 28px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    padding: 38px;
+    color: var(--card-text);
+}
+
+.back-icon {
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.back-icon:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.ico {
+    width: 22px;
+    height: 22px;
+}
+
+.bell-img {
+    position: absolute;
+    top: -18px;
+    right: -14px;
+    width: var(--bell-w);
+    height: var(--bell-h);
+    border-radius: 50%;
+    background: #ffffff;
+    padding: 8px;
+    box-shadow: 0 10px 24px -8px rgba(0,0,0,0.35);
+    z-index: 2;
+    object-fit: contain;
+}
+
+.card-title {
+    margin: 0;
+    font-size: var(--card-title-size);
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.card-sub {
+    margin: 6px 0 24px;
+    font-size: var(--sub-size);
+    opacity: 0.95;
+}
+
+.field {
+    width: 100%;
+    background: var(--field-bg);
+    border: 1px solid var(--field-border);
+    border-radius: 12px;
+    color: var(--card-text);
+    font-size: var(--field-size);
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.field::placeholder {
+    color: rgba(255,255,255,0.70);
+}
+
+.field:focus {
+    outline: none;
+    border-color: #ffffff;
+    background: rgba(255,255,255,0.15);
+}
+
+.area {
+    resize: vertical;
+    min-height: 44px;
+}
+
+.actions {
+    display: flex;
+    gap: 20px;
+    margin-top: 10px;
+}
+
+.btn {
+    flex: 1;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    font-size: var(--btn-size);
+    background: var(--btn-bg);
+    color: var(--btn-text);
+    padding: 16px;
+    border-radius: 12px;
+    transition: transform .12s ease,
+                box-shadow .12s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px -8px rgba(0,0,0,0.4);
+}
+
+.btn:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 3px;
+}
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(20,80,189,0.55);
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+}
+
+.success {
+    text-align: center;
+}
+
+.check {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 14px;
+    fill: none;
+    stroke: var(--card-text);
+    stroke-width: 2.6;
+}
+
+/* Toast */
+
+.kv-toast {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 280px;
+    max-width: 92vw;
+    padding: 14px 16px;
+    border-radius: 12px;
+    color: var(--toast-text);
+    box-shadow: 0 16px 40px -12px rgba(0,0,0,0.45);
+}
+
+.kv-toast--success {
+    background: var(--toast-success);
+}
+
+.kv-toast--warning {
+    background: var(--toast-warning);
+}
+
+.kv-toast--error {
+    background: var(--toast-error);
+}
+
+.kv-toast--info {
+    background: var(--toast-info);
+}
+
+.kv-toast__body {
+    display: flex;
+    flex-direction: column;
+}
+
+.kv-toast__title {
+    font-weight: 700;
+}
+
+.kv-toast__msg {
+    opacity: 0.95;
+}
+
+.kv-toast__close {
+    margin-left: auto;
+    background: none;
+    border: 0;
+    color: inherit;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+
+    .hero {
+        flex-direction: column;
+        gap: 25px;
+    }
+
+    .brandcol {
+        max-width: 100%;
+        align-items: center;
+        text-align: center;
+    }
+
+    .logo-img {
+        max-width: 220px;
+    }
+
+    .illus-box {
+        max-width: 260px;
+        height: 220px;
+    }
+
+    .cardwrap {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .card {
+        padding: 28px;
+    }
+
+    .actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .btn {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn {
+        transition: none;
+    }
+}
