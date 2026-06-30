@@ -1,0 +1,380 @@
+public class OrderApprovalHelper {
+
+    private static Id getBuyerManagerPermSetId() {
+        List<PermissionSet> permSets = [
+            SELECT Id FROM PermissionSet
+            WHERE  Name = 'B2BBuyerManager'
+            LIMIT  1
+        ];
+        return permSets.isEmpty() ? null : permSets[0].Id;
+    }
+
+    private static Id getOrgWideEmailAddressId() {
+        List<OrgWideEmailAddress> orgWideAddresses = [
+            SELECT Id
+            FROM   OrgWideEmailAddress
+            WHERE  DisplayName LIKE '%support%'
+            LIMIT  1
+        ];
+        if (orgWideAddresses.isEmpty()) {
+            orgWideAddresses = [SELECT Id FROM OrgWideEmailAddress LIMIT 1];
+        }
+        return orgWideAddresses.isEmpty() ? null : orgWideAddresses[0].Id;
+    }
+
+    private static Id getEmailTemplateId() {
+        List<EmailTemplate> emailTemplates = [
+            SELECT Id FROM EmailTemplate
+            WHERE  DeveloperName = 'Order_Approval_Required'
+            LIMIT  1
+        ];
+        return emailTemplates.isEmpty() ? null : emailTemplates[0].Id;
+    }
+
+    private static Id getNotificationTypeId() {
+        List<CustomNotificationType> notificationTypes = [
+            SELECT Id FROM CustomNotificationType
+            WHERE  DeveloperName = 'Order_Approval_Required'
+            LIMIT  1
+        ];
+        return notificationTypes.isEmpty() ? null : notificationTypes[0].Id;
+    }
+
+   @future
+public static void setPendingApproval(List<Id> orderIds) {
+
+    if (orderIds == null || orderIds.isEmpty()) {
+        return;
+    }
+
+    try {
+
+        List<Order> orders = [
+            SELECT Id,
+                   CreatedById,
+                   GrandTotalAmount,
+                   TotalAmount
+            FROM Order
+            WHERE Id IN :orderIds
+        ];
+
+        Set<Id> creatorIds = new Set<Id>();
+
+        for (Order ord : orders) {
+            if (ord.CreatedById != null) {
+                creatorIds.add(ord.CreatedById);
+            }
+        }
+
+        Map<Id, Id> creatorToContact =
+            new Map<Id, Id>();
+
+        for (User user : [
+            SELECT Id,
+                   ContactId
+            FROM User
+            WHERE Id IN :creatorIds
+            AND ContactId != null
+        ]) {
+
+            creatorToContact.put(
+                user.Id,
+                user.ContactId
+            );
+        }
+
+        Map<Id, Contact> contactById =
+            new Map<Id, Contact>([
+                SELECT Id,
+                       KV_Super_User__c,
+                       KV_Contact_Remaining_Amount__c
+                FROM Contact
+                WHERE Id IN :creatorToContact.values()
+            ]);
+
+        List<Order> ordersToUpdate =
+            new List<Order>();
+
+        List<OrderSummary> summariesToUpdate =
+            new List<OrderSummary>();
+
+        Map<Id, OrderSummary> summaryMap =
+            new Map<Id, OrderSummary>();
+
+        for (OrderSummary summary : [
+            SELECT Id,
+                   OriginalOrderId
+            FROM OrderSummary
+            WHERE OriginalOrderId IN :orderIds
+        ]) {
+            summaryMap.put(
+              summary.OriginalOrderId,
+                summary
+            );
+        }
+
+        List<Id> approvalOrders =
+            new List<Id>();
+
+        for (Order order : orders) {
+
+            Id contactId =
+                creatorToContact.get(
+                    order.CreatedById
+                );
+
+            Contact contact =
+                contactId != null
+                ? contactById.get(contactId)
+                : null;
+
+            Decimal amount =
+                order.GrandTotalAmount != null
+                ? order.GrandTotalAmount
+                : (order.TotalAmount != null
+                    ? order.TotalAmount
+                    : 0);
+
+            Decimal remaining =
+                contact != null &&
+                contact.KV_Contact_Remaining_Amount__c != null
+                ? contact.KV_Contact_Remaining_Amount__c
+                : 0;
+
+            if (contact != null &&
+                contact.KV_Super_User__c == true &&
+                amount <= remaining) {
+
+                ordersToUpdate.add(
+                    new Order(
+                        Id = order.Id,
+                        Status = 'Ready for Fulfilment'
+                    )
+                );
+
+                if (summaryMap.containsKey(order.Id)) {
+                    summariesToUpdate.add(
+                        new OrderSummary(
+                            Id = summaryMap.get(order.Id).Id,
+                            Status = 'Ready for Fulfilment'
+                        )
+                    );
+                }
+            }
+            else {
+
+                approvalOrders.add(
+                    order.Id
+                );
+
+                ordersToUpdate.add(
+                    new Order(
+                        Id = order.Id,
+                        Status = 'Pending for Approval'
+                    )
+                );
+
+                if (summaryMap.containsKey(order.Id)) {
+                    summariesToUpdate.add(
+                        new OrderSummary(
+                            Id = summaryMap.get(order.Id).Id,
+                            Status = 'Pending for Approval'
+                        )
+                    );
+                }
+            }
+        }
+
+        if (!ordersToUpdate.isEmpty()) {
+            update ordersToUpdate;
+        }
+
+        if (!summariesToUpdate.isEmpty()) {
+            update summariesToUpdate;
+        }
+
+        if (!approvalOrders.isEmpty()) {
+            sendEmailToManagers(approvalOrders);
+            notifyBuyerManagers(approvalOrders);
+        }
+
+    } catch (Exception pendingApprovalException) {
+            pendingApprovalException.getMessage();
+        
+    }
+}
+
+    public static void sendEmailToManagers(List<Id> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) return;
+
+        List<Order> orders = [
+            SELECT Id, OrderNumber, AccountId
+            FROM   Order
+            WHERE  Id IN :orderIds
+            AND    AccountId != null
+        ];
+        if (orders.isEmpty()) return;
+
+        Id emailTemplateId    = getEmailTemplateId();
+        Id orgWideAddressId   = getOrgWideEmailAddressId();
+        Id buyerManagerPermId = getBuyerManagerPermSetId();
+
+        if (emailTemplateId == null || orgWideAddressId == null || buyerManagerPermId == null) return;
+
+        Set<Id> accountIds = new Set<Id>();
+        for (Order order : orders) accountIds.add(order.AccountId);
+
+        List<User> buyerManagers = [
+            SELECT Id, Email, Contact.AccountId, ContactId
+            FROM   User
+            WHERE  IsActive        = true
+            AND    ContactId      != null
+            AND    Contact.AccountId IN :accountIds
+            AND    Id IN (
+                SELECT AssigneeId
+                FROM   PermissionSetAssignment
+                WHERE  PermissionSetId = :buyerManagerPermId
+            )
+        ];
+        if (buyerManagers.isEmpty()) return;
+
+        Map<Id, List<User>> managersByAccount = new Map<Id, List<User>>();
+        for (User buyerManager : buyerManagers) {
+            Id accountId = buyerManager.Contact.AccountId;
+            if (!managersByAccount.containsKey(accountId)) {
+                managersByAccount.put(accountId, new List<User>());
+            }
+            managersByAccount.get(accountId).add(buyerManager);
+        }
+
+        List<Messaging.SingleEmailMessage> emailsToSend = new List<Messaging.SingleEmailMessage>();
+        for (Order order : orders) {
+            List<User> recipientManagers = managersByAccount.get(order.AccountId);
+            if (recipientManagers == null || recipientManagers.isEmpty()) continue;
+
+            for (User recipientManager : recipientManagers) {
+                Messaging.SingleEmailMessage emailMessage = new Messaging.SingleEmailMessage();
+                emailMessage.setTemplateId(emailTemplateId);
+                emailMessage.setWhatId(order.Id);
+                emailMessage.setTargetObjectId(recipientManager.ContactId);
+                emailMessage.setOrgWideEmailAddressId(orgWideAddressId);
+                emailMessage.setSaveAsActivity(false);
+                emailsToSend.add(emailMessage);
+            }
+        }
+
+        if (!emailsToSend.isEmpty()) Messaging.sendEmail(emailsToSend, false);
+    }
+
+    public static void notifyBuyerManagers(List<Id> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) return;
+
+        List<Order> orders = [
+            SELECT Id, OrderNumber, AccountId
+            FROM   Order
+            WHERE  Id IN :orderIds
+            AND    AccountId != null
+        ];
+        if (orders.isEmpty()) return;
+
+        Id notificationTypeId = getNotificationTypeId();
+        Id buyerManagerPermId = getBuyerManagerPermSetId();
+
+        if (notificationTypeId == null || buyerManagerPermId == null) return;
+
+        Set<Id> accountIds = new Set<Id>();
+        for (Order order : orders) accountIds.add(order.AccountId);
+
+        List<User> buyerManagers = [
+            SELECT Id, Contact.AccountId
+            FROM   User
+            WHERE  IsActive        = true
+            AND    ContactId      != null
+            AND    Contact.AccountId IN :accountIds
+            AND    Id IN (
+                SELECT AssigneeId
+                FROM   PermissionSetAssignment
+                WHERE  PermissionSetId = :buyerManagerPermId
+            )
+        ];
+        if (buyerManagers.isEmpty()) return;
+
+        Map<Id, Set<String>> managerIdsByAccount = new Map<Id, Set<String>>();
+        for (User buyerManager : buyerManagers) {
+            Id accountId = buyerManager.Contact.AccountId;
+            if (!managerIdsByAccount.containsKey(accountId)) {
+                managerIdsByAccount.put(accountId, new Set<String>());
+            }
+            managerIdsByAccount.get(accountId).add(buyerManager.Id);
+        }
+
+        Map<Id, Id> orderIdToSummaryIdMap = new Map<Id, Id>();
+        for (OrderSummary orderSummary : [
+            SELECT Id, OriginalOrderId FROM OrderSummary
+            WHERE  OriginalOrderId IN :orderIds
+        ]) {
+            orderIdToSummaryIdMap.put(orderSummary.OriginalOrderId, orderSummary.Id);
+        }
+
+        for (Order order : orders) {
+            Set<String> recipientUserIds = managerIdsByAccount.get(order.AccountId);
+            if (recipientUserIds == null || recipientUserIds.isEmpty()) continue;
+
+            Id notificationTargetId = orderIdToSummaryIdMap.containsKey(order.Id)
+                ? orderIdToSummaryIdMap.get(order.Id)
+                : order.Id;
+
+            Messaging.CustomNotification customNotification = new Messaging.CustomNotification();
+            customNotification.setNotificationTypeId(notificationTypeId);
+            customNotification.setTitle('Order Approval Required');
+            customNotification.setBody('Order ' + order.OrderNumber + ' is pending your approval.');
+            customNotification.setTargetId(notificationTargetId);
+
+            try {
+                customNotification.send(recipientUserIds);
+            } catch (Exception notificationException) {
+                notificationException.getMessage();
+            }
+        }
+    }
+
+    @future
+    public static void setReadyForFulfilment(List<Id> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) return;
+
+        try {
+            List<Order> ordersToUpdate = new List<Order>();
+            for (Id orderId : orderIds) {
+                ordersToUpdate.add(new Order(Id = orderId, Status = 'Ready for Fulfilment'));
+            }
+            if (!ordersToUpdate.isEmpty()) update ordersToUpdate;
+
+            List<OrderSummary> summariesToUpdate = [
+                SELECT Id FROM OrderSummary
+                WHERE OriginalOrderId IN :orderIds
+            ];
+            for (OrderSummary orderSummary : summariesToUpdate) {
+                orderSummary.Status = 'Ready for Fulfilment';
+            }
+            if (!summariesToUpdate.isEmpty()) update summariesToUpdate;
+
+        } catch (Exception fulfilmentException) {
+            fulfilmentException.getMessage();
+        }
+    }
+
+    @future
+    public static void setReadyForFulfilment(Id orderId, Id summaryId) {
+        if (orderId == null || summaryId == null) return;
+
+        try {
+            update new Order(Id = orderId, Status = 'Ready for Fulfilment');
+            update new OrderSummary(Id = summaryId, Status = 'Ready for Fulfilment');
+        } catch (Exception fulfilmentException) {
+            fulfilmentException.getMessage();
+        }
+    }
+    
+    
+    
+}
