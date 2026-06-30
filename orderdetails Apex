@@ -1,0 +1,252 @@
+public without sharing class OrderDetailsController {
+
+    private static final String CONFIG_KEY = 'DEFAULT';
+
+
+    @AuraEnabled(cacheable=true)
+    public static OrderDetailWrapper getOrderDetails(String orderSummaryId) {
+        validateId(orderSummaryId);
+        try {
+            Order order = [
+                SELECT Id, OrderNumber, Status, TotalAmount, EffectiveDate, CreatedBy.Name
+                FROM   Order
+                WHERE  Id IN (SELECT OriginalOrderId FROM OrderSummary WHERE Id = :orderSummaryId)
+                WITH   SECURITY_ENFORCED
+                LIMIT  1
+            ];
+
+            OrderDetailWrapper wrapper = new OrderDetailWrapper();
+            wrapper.orderId       = order.Id;
+            wrapper.orderNumber   = order.OrderNumber;
+            wrapper.status        = order.Status;
+            wrapper.totalAmount   = nvl(order.TotalAmount);
+            wrapper.effectiveDate = order.EffectiveDate != null ? String.valueOf(order.EffectiveDate) : '';
+            wrapper.userName      = order.CreatedBy     != null ? order.CreatedBy.Name : '';
+            return wrapper;
+
+        } catch (AuraHandledException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new AuraHandledException('Error fetching order details: ' + error.getMessage());
+        }
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<OrderItemWrapper> getOrderItems(String orderSummaryId) {
+        validateId(orderSummaryId);
+        try {
+            // 1. OrderItems (unchanged)
+            List<OrderItem> items = [
+                SELECT Id, Product2Id,
+                       Product2.Name, Product2.StockKeepingUnit,
+                       Product2.ProductCode, Product2.Family, Product2.Description,
+                       Product2.KV_Client_Code__c,
+                       Quantity, UnitPrice, TotalPrice
+                FROM   OrderItem
+                WHERE  OrderId IN (SELECT OriginalOrderId FROM OrderSummary WHERE Id = :orderSummaryId)
+                WITH   SECURITY_ENFORCED
+                ORDER BY CreatedDate ASC
+            ];
+
+            // 2. Actual charged tax from OrderItemSummary
+            Map<Id, OrderItemSummary> oisByItemId = new Map<Id, OrderItemSummary>();
+            for (OrderItemSummary ois : [
+                SELECT Id, OriginalOrderItemId, Quantity,
+                       TotalLineTaxAmount, TotalLineAmountWithTax
+                FROM   OrderItemSummary
+                WHERE  OrderSummaryId = :orderSummaryId
+                AND    Type = 'Order Product'
+            ]) {
+                if (ois.OriginalOrderItemId != null) {
+                    oisByItemId.put(ois.OriginalOrderItemId, ois);
+                }
+            }
+
+            // 3. Category via ProductCategoryProduct
+            Set<Id> productIds = new Set<Id>();
+            for (OrderItem item : items) {
+                if (item.Product2Id != null) productIds.add(item.Product2Id);
+            }
+
+            Map<Id, String> productToCategory = new Map<Id, String>();
+            if (!productIds.isEmpty()) {
+                for (ProductCategoryProduct product : [
+                    SELECT ProductId, ProductCategory.Name
+                    FROM   ProductCategoryProduct
+                    WHERE  ProductId IN :productIds
+                    LIMIT  1000
+                ]) {
+                    if (!productToCategory.containsKey(product.ProductId)) {
+                        productToCategory.put(product.ProductId, product.ProductCategory.Name);
+                    }
+                }
+            }
+
+            // 4. Build wrappers
+            List<OrderItemWrapper> result = new List<OrderItemWrapper>(items.size());
+            for (OrderItem item : items) {
+                OrderItemWrapper web = toWrapper(item, oisByItemId.get(item.Id));
+                web.productCategory = productToCategory.get(item.Product2Id);
+                result.add(web);
+            }
+            return result;
+
+        } catch (AuraHandledException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new AuraHandledException('Error fetching order items: ' + error.getMessage());
+        }
+    }
+
+
+    @AuraEnabled(cacheable=true)
+    public static List<TierWrapper> getQuantityTiers() {
+        List<TierWrapper> tiers = new List<TierWrapper>();
+        String configJson = loadConfigJson();
+
+        if (String.isBlank(configJson)) return tiers;
+
+        try {
+            List<Object> rows = (List<Object>) JSON.deserializeUntyped(configJson);
+            for (Object row : rows) {
+                Map<String, Object> rowMap = (Map<String, Object>) row;
+                String label = (String) rowMap.get('label');
+                if (String.isBlank(label)) continue;
+
+                TierWrapper tierWrapper = new TierWrapper();
+                tierWrapper.id = (rowMap.get('id') == null) ? null : String.valueOf(rowMap.get('id'));
+                tierWrapper.label = label;
+                Object maxValue = rowMap.get('max');
+                tierWrapper.max = (maxValue == null) ? null : Decimal.valueOf(String.valueOf(maxValue));
+                tierWrapper.color = (rowMap.get('color') == null) ? null : String.valueOf(rowMap.get('color'));
+                tiers.add(tierWrapper);
+            }
+        } catch (Exception error) {
+
+        }
+        return tiers;
+    }
+
+    @AuraEnabled
+    public static String getTierConfigJson() {
+        return loadConfigJson();
+    }
+
+    @AuraEnabled
+    public static void saveTierConfig(String tiersJson) {
+        try {
+            List<Quantity_Tier_Config__c> existing = [
+                SELECT Id
+                FROM   Quantity_Tier_Config__c
+                WHERE  Config_Key__c = :CONFIG_KEY
+                LIMIT  1
+            ];
+
+            if (!existing.isEmpty()) {
+                existing[0].Tiers_JSON__c = tiersJson;
+                update existing[0];
+            } else {
+                insert new Quantity_Tier_Config__c(
+                    Config_Key__c = CONFIG_KEY,
+                    Tiers_JSON__c = tiersJson
+                );
+            }
+        } catch (Exception error) {
+            throw new AuraHandledException('Error saving tier config: ' + error.getMessage());
+        }
+    }
+
+    private static String loadConfigJson() {
+        List<Quantity_Tier_Config__c> configRecords = [
+            SELECT Tiers_JSON__c
+            FROM   Quantity_Tier_Config__c
+            WHERE  Config_Key__c = :CONFIG_KEY
+            LIMIT  1
+        ];
+        return configRecords.isEmpty() ? null : configRecords[0].Tiers_JSON__c;
+    }
+
+
+    private static void validateId(String id) {
+        if (String.isBlank(id)) {
+            throw new AuraHandledException('Order Summary ID is required.');
+        }
+    }
+
+    private static Decimal nvl(Decimal value) {
+        return value != null ? value : 0;
+    }
+
+    private static OrderItemWrapper toWrapper(OrderItem item, OrderItemSummary oisTax) {
+        OrderItemWrapper wrapper = new OrderItemWrapper();
+        Boolean hasProduct       = item.Product2 != null;
+
+        wrapper.itemId = item.Id;
+        wrapper.productId = item.Product2Id;
+        wrapper.productName = hasProduct ? item.Product2.Name : 'No Product';
+        wrapper.productSku  = hasProduct
+            ? (String.isNotBlank(item.Product2.StockKeepingUnit)
+                ? item.Product2.StockKeepingUnit
+                : (String.isNotBlank(item.Product2.ProductCode) ? item.Product2.ProductCode : ''))
+            : '';
+        wrapper.productFamily      = hasProduct ? item.Product2.Family      : '';
+        wrapper.productDescription = hasProduct ? item.Product2.Description : '';
+        wrapper.clientCode         = hasProduct ? item.Product2.KV_Client_Code__c : '';
+        wrapper.quantity  = nvl(item.Quantity);
+        wrapper.unitPrice = nvl(item.UnitPrice);
+
+        Decimal qty       = wrapper.quantity > 0 ? wrapper.quantity : 1;
+        Decimal unitPrice = wrapper.unitPrice;
+        Decimal lineTax   = (oisTax != null && oisTax.TotalLineTaxAmount != null)
+                            ? oisTax.TotalLineTaxAmount : 0;
+
+        wrapper.unitPriceExclVAT = unitPrice.setScale(2);
+
+        if (lineTax > 0) {
+            Decimal taxPerUnit       = lineTax / qty;
+            wrapper.unitPriceInclVAT = (unitPrice + taxPerUnit).setScale(2);
+            wrapper.totalPrice       = (wrapper.unitPriceInclVAT * qty).setScale(2);
+            wrapper.hasVAT           = true;
+        } else {
+            wrapper.unitPriceInclVAT = null;
+            wrapper.totalPrice       = (unitPrice * qty).setScale(2);
+            wrapper.hasVAT           = false;
+        }
+
+        return wrapper;
+    }
+
+
+    public class OrderDetailWrapper {
+        @AuraEnabled public String  orderId;
+        @AuraEnabled public String  orderNumber;
+        @AuraEnabled public String  status;
+        @AuraEnabled public Decimal totalAmount;
+        @AuraEnabled public String  effectiveDate;
+        @AuraEnabled public String  userName;
+    }
+
+    public class OrderItemWrapper {
+        @AuraEnabled public String  itemId;
+        @AuraEnabled public String  productId;
+        @AuraEnabled public String  productName;
+        @AuraEnabled public String  productSku;
+        @AuraEnabled public String  productFamily;
+        @AuraEnabled public String  productDescription;
+        @AuraEnabled public String  clientCode;
+        @AuraEnabled public String  productCategory;
+        @AuraEnabled public Decimal quantity;
+        @AuraEnabled public Decimal unitPrice;
+        @AuraEnabled public Decimal totalPrice;
+        @AuraEnabled public Decimal unitPriceExclVAT;
+        @AuraEnabled public Decimal unitPriceInclVAT;
+        @AuraEnabled public Boolean hasVAT;
+    }
+
+    public class TierWrapper {
+        @AuraEnabled public String  id;
+        @AuraEnabled public String  label;
+        @AuraEnabled public Decimal max;
+        @AuraEnabled public String  color;
+    }
+}
