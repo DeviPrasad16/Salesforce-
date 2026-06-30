@@ -1,0 +1,95 @@
+public without sharing class KV_OrderBudgetTriggerHandler {
+
+    private static final String CONSUME_STATUS = 'Ready for Fulfilment';
+
+    public static void deductBuyerBudget(
+        List<Order> updatedOrders,
+        Map<Id, Order> previousOrderMap
+    ) {
+        
+        Set<Id> orderIds = new Set<Id>();
+        for (Order current : updatedOrders) {
+            Order previous = previousOrderMap.get(current.Id);
+            if (previous.Status != CONSUME_STATUS &&
+                current.Status  == CONSUME_STATUS) {
+                orderIds.add(current.Id);
+            }
+        }
+        if (orderIds.isEmpty()) return;
+
+       
+        List<Order> orders = [
+            SELECT Id, TotalAmount, AccountId, CreatedById
+            FROM   Order
+            WHERE  Id IN :orderIds
+        ];
+
+       
+        Set<Id> creatorIds = new Set<Id>();
+        for (Order order : orders) creatorIds.add(order.CreatedById);
+
+        Map<Id, Id> contactByUserId = new Map<Id, Id>();
+        for (User user: [
+            SELECT Id, ContactId
+            FROM   User
+            WHERE  Id IN :creatorIds
+            AND    ContactId != null
+        ]) {
+            contactByUserId.put(user.Id, user.ContactId);
+        }
+
+       
+        Map<Id, Decimal> deductByContactId = new Map<Id, Decimal>();
+        for (Order order : orders) {
+            Id contactId = contactByUserId.get(order.CreatedById);
+            if (contactId == null) continue;
+            Decimal amt     = order.TotalAmount == null ? 0 : order.TotalAmount;
+            Decimal running = deductByContactId.containsKey(contactId)
+                                ? deductByContactId.get(contactId) : 0;
+            deductByContactId.put(contactId, running + amt);
+        }
+
+        if (deductByContactId.isEmpty()) return;
+
+        
+        List<Contact> contacts = [
+            SELECT Id, KV_Contact_Current_Utilized__c,
+                   KV_Contact_Utilized_Amount__c,
+                   KV_Contact_Remaining_Amount__c,
+                   KV_Department__c,
+                   KV_Super_User__c
+            FROM   Contact
+            WHERE  Id IN :deductByContactId.keySet()
+            FOR UPDATE
+        ];
+
+        List<Contact> contactsToUpdate = new List<Contact>();
+        for (Contact contact : contacts) {
+            Decimal orderAmt  = deductByContactId.get(contact.Id);
+            Decimal remaining = contact.KV_Contact_Remaining_Amount__c == null
+                                ? 0 : contact.KV_Contact_Remaining_Amount__c;
+
+           
+            if (orderAmt > remaining && contact.KV_Super_User__c != true) {
+                continue;
+            }
+
+           
+            contact.KV_Contact_Current_Utilized__c =
+                (contact.KV_Contact_Current_Utilized__c == null ? 0 : contact.KV_Contact_Current_Utilized__c)
+                + orderAmt;
+
+            
+            contact.KV_Contact_Utilized_Amount__c =
+                (contact.KV_Contact_Utilized_Amount__c == null ? 0 : contact.KV_Contact_Utilized_Amount__c)
+                + orderAmt;
+
+            contactsToUpdate.add(contact);
+            
+        }
+
+        if (!contactsToUpdate.isEmpty()) {
+            update contactsToUpdate;
+        }
+    }
+}
